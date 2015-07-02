@@ -38,7 +38,7 @@ class Image(object):
         num_y, num_x = data.shape
         x_range = np.arange(0, num_x+spacing, spacing)
         y_range = np.arange(0, num_y+spacing, spacing)
-        x_grid, y_grid = np.meshgrid(x_range, y_range)
+        y_grid, x_grid = np.meshgrid(x_range, y_range)
 
         ra_grid, dec_grid = self.wcs.all_pix2world(x_grid, y_grid, 0)
 

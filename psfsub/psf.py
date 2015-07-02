@@ -95,6 +95,7 @@ class Psf(object):
             np.dstack([rot_x_grid, rot_y_grid])
         )
 
+        psf.psf_spline = spline
         psf.data = spline.ev(sample_x_grid, sample_y_grid)
         psf.x_range = rot_x_range
         psf.y_range = rot_y_range
