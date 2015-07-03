@@ -56,48 +56,36 @@ def do_subtraction(ra, dec):
     ref_vals, ref_errs, ref_psfs, ref_ras, ref_decs = ref_data
     new_vals, new_errs, new_psfs, new_ras, new_decs = new_data
 
-    ref_count = len(ref_vals)
-    new_count = len(new_vals)
+    #ref_count = len(ref_vals)
+    #new_count = len(new_vals)
 
-    print "Number of indices to use: %d ref, %d new" % (ref_count, new_count)
+    #print "Number of indices to use: %d ref, %d new" % (ref_count, new_count)
 
     # TODO: deal with multiple psfs
     #new_psf = new_psfs[0]
     #ref_psf = ref_psfs[0]
 
-    print "Generating system matrices"
-
-    gg = np.zeros(dtype=float, shape=(new_count, new_count))
-    gh = np.zeros(dtype=float, shape=(new_count, ref_count))
-    hh = np.zeros(dtype=float, shape=(ref_count, ref_count))
-    gsn = np.zeros(dtype=float, shape=(new_count))
+    #print "Generating system matrices"
 
     # TODO: Check that the order of my differences is right!
 
-    for i1, (ra1, dec1) in enumerate(zip(new_ras, new_decs)):
-        for i2, (ra2, dec2) in enumerate(zip(new_ras, new_decs)):
-            diff_x = (ra2 - ra1) * cos_dec / 0.13 * 3600.
-            diff_y = (dec2 - dec1) / 0.13 * 3600.
-            gg[i1, i2] = gg_spline(diff_x, diff_y)
+    diff_x = np.subtract.outer(new_ras, new_ras) * cos_dec / 0.13 * 3600.
+    diff_y = np.subtract.outer(new_decs, new_decs) / 0.13 * 3600.
+    gg = gg_spline.ev(diff_x, diff_y)
 
-    for i1, (ra1, dec1) in enumerate(zip(new_ras, new_decs)):
-        for i2, (ra2, dec2) in enumerate(zip(ref_ras, ref_decs)):
-            diff_x = (ra2 - ra1) * cos_dec / 0.13 * 3600.
-            diff_y = (dec2 - dec1) / 0.13 * 3600.
-            gh[i1, i2] = gh_spline(diff_x, diff_y)
+    diff_x = np.subtract.outer(new_ras, ref_ras) * cos_dec / 0.13 * 3600.
+    diff_y = np.subtract.outer(new_decs, ref_decs) / 0.13 * 3600.
+    gh = gh_spline.ev(diff_x, diff_y)
 
-    for i1, (ra1, dec1) in enumerate(zip(ref_ras, ref_decs)):
-        for i2, (ra2, dec2) in enumerate(zip(ref_ras, ref_decs)):
-            diff_x = (ra2 - ra1) * cos_dec / 0.13 * 3600.
-            diff_y = (dec2 - dec1) / 0.13 * 3600.
-            hh[i1, i2] = hh_spline(diff_x, diff_y)
+    diff_x = np.subtract.outer(ref_ras, ref_ras) * cos_dec / 0.13 * 3600.
+    diff_y = np.subtract.outer(ref_decs, ref_decs) / 0.13 * 3600.
+    hh = hh_spline.ev(diff_x, diff_y)
 
-    for i1, (ra1, dec1) in enumerate(zip(new_ras, new_decs)):
-        diff_x = (ra - ra1) * cos_dec / 0.13 * 3600.
-        diff_y = (dec - dec1) / 0.13 * 3600.
-        gsn[i1] = new_psf.psf_spline(diff_x, diff_y)
+    diff_x = (ra - new_ras) * cos_dec / 0.13 * 3600.
+    diff_y = (dec - new_decs) / 0.13 * 3600.
+    gsn = new_psf.psf_spline.ev(diff_x, diff_y)
 
-    print "Calculating ABCD matrices"
+    #print "Calculating ABCD matrices"
 
     amp = 0.5
     f = 0.5
@@ -108,33 +96,31 @@ def do_subtraction(ra, dec):
     c = -2. * gh*f**2
     d = hh*f**2 + ref_n
 
-    print "Calculating S and T matrices"
+    #print "Calculating S and T matrices"
 
     t = - np.linalg.inv(2*a - 1/2.*c.dot(np.linalg.inv(d).dot(c.T))).dot(b)
     s = -1/2. * np.linalg.inv(d).dot(c.T.dot(t).T)
 
-    print "Sum of t,s: ", np.sum(t), np.sum(s)
+    #print "Sum of t,s: ", np.sum(t), np.sum(s)
 
-    print "Median values", np.median(new_vals), np.median(ref_vals)
+    #print "Median values", np.median(new_vals), np.median(ref_vals)
 
-    print t.dot(new_vals)
-    print s.dot(ref_vals)
+    #print t.dot(new_vals)
+    #print s.dot(ref_vals)
 
-    print t.dot(new_vals) - s.dot(ref_vals)
+    #print t.dot(new_vals) - s.dot(ref_vals)
 
     return t.dot(new_vals) - s.dot(ref_vals)
 
 
-def do_grid(ra, dec):
+def do_grid(ra, dec, num_side=10, pixel_sep=0.1):
     """Generate a grid of subtraction around some ra and dec"""
-    pixel_sep = 0.2
-    num_side = 3
-
     out_grid = np.zeros((num_side*2+1, num_side*2+1))
 
     ra_range = (ra + np.arange(-num_side, num_side+1) * pixel_sep / 3600. /
                 cos_dec)
-    dec_range = (dec + np.arange(-num_side, num_side+1) * pixel_sep / 3600.)
+    dec_range = (dec + np.arange(num_side, -num_side-1, -1) * pixel_sep /
+                 3600.)
 
     for i, ra_val in enumerate(ra_range):
         for j, dec_val in enumerate(dec_range):
@@ -143,5 +129,5 @@ def do_grid(ra, dec):
     return out_grid
 
 
-#if __name__ == "__main__":
-    #do_subtraction(153.537692442, 0.643537089685)
+if __name__ == "__main__":
+    do_subtraction(center_ra, center_dec)

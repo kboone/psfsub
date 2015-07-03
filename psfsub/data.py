@@ -2,8 +2,8 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-from astropy.coordinates import SkyCoord
 import astropy.units as u
+from scipy.spatial import KDTree
 
 from psfsub.psf import Psf
 
@@ -34,6 +34,7 @@ class Image(object):
         # Get a spline to do the WCS transformation. We want RA and DEC for
         # each pixel.
         self.wcs = WCS(hdulist['SCI'].header, fobj=hdulist)
+        self.center_ra, self.center_dec = self.wcs.wcs.crval
         spacing = 50
         num_y, num_x = data.shape
         x_range = np.arange(0, num_x+spacing, spacing)
@@ -63,7 +64,10 @@ class Image(object):
         self.ras = ra_spline.ev(eval_x, eval_y)
         self.decs = dec_spline.ev(eval_x, eval_y)
 
-        self.catalog = SkyCoord(ra=self.ras*u.degree, dec=self.decs*u.degree)
+        # KDTree. Distances need to be in arcsec
+        ra_arcsec = self.ras * np.cos(self.center_dec * np.pi / 180.) * 3600.
+        dec_arcsec = self.decs * 3600.
+        self.kdtree = KDTree(zip(ra_arcsec, dec_arcsec))
 
     def find_near(self, ra, dec, match_dist):
         """Find all pixels within a given distance in arcsec"""
@@ -79,8 +83,13 @@ class Image(object):
         # match_dist*u.arcsec
         # )
 
-        loc = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
-        idx = np.where(loc.separation(self.catalog) < match_dist*u.arcsec)
+        #loc = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+        #idx = np.where(loc.separation(self.catalog) < match_dist*u.arcsec)
+
+        ra_arcsec = ra * np.cos(self.center_dec * np.pi / 180.) * 3600.
+        dec_arcsec = dec * 3600.
+
+        idx = self.kdtree.query_ball_point((ra_arcsec, dec_arcsec), match_dist)
 
         return (self.vals[idx], self.errs[idx], self.psfs[idx], self.ras[idx],
                 self.decs[idx])
