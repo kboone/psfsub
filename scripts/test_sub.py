@@ -2,6 +2,7 @@
 
 from psfsub.data import Image
 import numpy as np
+from matplotlib import pyplot as plt
 
 ref_images = [
     Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v1/F105W/icn135ffq_pam.fits',
@@ -12,11 +13,11 @@ ref_images = [
           '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits', 11)
 ]
 new_images = [
-    Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v2/F105W/icn136aaq_pam.fits',
+    Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v2_fakes/F105W/icn136aaq_pam.fits',
           '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits', 11),
-    Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v2/F105W/icn136adq_pam.fits',
+    Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v2_fakes/F105W/icn136adq_pam.fits',
           '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits', 11),
-    Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v2/F105W/icn136afq_pam.fits',
+    Image('/home/scpdata05/clustersn/kboone/idcsj/data/SPARCSJ0330/v2_fakes/F105W/icn136afq_pam.fits',
           '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits', 11)
 ]
 
@@ -48,13 +49,26 @@ hh_spline = ref_psf.get_convolution_spline(ref_psf)
 
 
 
-def do_subtraction(ra, dec):
+def do_subtraction(ra, dec, radius=0.2, amp=1.0, f=0.2):
     print "Doing subtraction for (%f, %f)" % (ra, dec)
-    ref_data = np.hstack([i.find_near(ra, dec, 0.5) for i in ref_images])
-    new_data = np.hstack([i.find_near(ra, dec, 0.5) for i in new_images])
+    ref_data = np.hstack([i.find_near(ra, dec, radius) for i in ref_images])
+    new_data = np.hstack([i.find_near(ra, dec, radius) for i in new_images])
 
     ref_vals, ref_errs, ref_psfs, ref_ras, ref_decs = ref_data
     new_vals, new_errs, new_psfs, new_ras, new_decs = new_data
+
+    if len(ref_vals) == 0 or len(new_vals) == 0:
+        return 0
+
+    # TODO: Don't use new data when estimating f. This puts in some bias which
+    # is not good.
+    f = np.median(ref_vals)
+    #f_gg = np.outer(new_vals, new_vals)
+    #f_gh = np.outer(new_vals, ref_vals)
+    #f_hh = np.outer(ref_vals, ref_vals)
+
+    new_n = np.diag(new_errs**2)
+    ref_n = np.diag(ref_errs**2)
 
     #ref_count = len(ref_vals)
     #new_count = len(new_vals)
@@ -86,11 +100,6 @@ def do_subtraction(ra, dec):
     gsn = new_psf.psf_spline.ev(diff_x, diff_y)
 
     #print "Calculating ABCD matrices"
-
-    amp = 0.5
-    f = 0.5
-    new_n = np.diag(new_errs**2)
-    ref_n = np.diag(ref_errs**2)
     a = gg*f**2 + amp**2 * np.outer(gsn, gsn) + new_n
     b = -2. * amp**2 * gsn
     c = -2. * gh*f**2
@@ -108,26 +117,41 @@ def do_subtraction(ra, dec):
     #print t.dot(new_vals)
     #print s.dot(ref_vals)
 
-    #print t.dot(new_vals) - s.dot(ref_vals)
+    print t.dot(new_vals) - s.dot(ref_vals)
+
+    #print np.sum(t), np.sum(s)
+    #print np.median(new_vals), np.median(ref_vals)
+    #print np.mean(new_vals), np.mean(ref_vals)
+    #print np.sum(t) * np.median(new_vals) - np.sum(s) * np.median(ref_vals)
 
     return t.dot(new_vals) - s.dot(ref_vals)
 
 
-def do_grid(ra, dec, num_side=10, pixel_sep=0.1):
+def do_grid(ra, dec, num_side=10, pixel_sep=0.1, **kwargs):
     """Generate a grid of subtraction around some ra and dec"""
     out_grid = np.zeros((num_side*2+1, num_side*2+1))
 
-    ra_range = (ra + np.arange(-num_side, num_side+1) * pixel_sep / 3600. /
+    ra_range = (ra + np.arange(num_side, -num_side-1, -1) * pixel_sep / 3600. /
                 cos_dec)
-    dec_range = (dec + np.arange(num_side, -num_side-1, -1) * pixel_sep /
+    dec_range = (dec + np.arange(-num_side, num_side+1) * pixel_sep /
                  3600.)
 
     for i, ra_val in enumerate(ra_range):
         for j, dec_val in enumerate(dec_range):
-            out_grid[j, i] = do_subtraction(ra_val, dec_val)
+            out_grid[j, i] = do_subtraction(ra_val, dec_val, **kwargs)
 
     return out_grid
 
+def showim(data):
+    """Nice imshow that does things right"""
+    plt.ion()
+    plt.figure()
+    scale = np.median(np.abs(data))
+    plt.imshow(data, origin='lower', cmap='gray', interpolation='none',
+               vmin=-scale*10., vmax=scale*15.)
+    plt.colorbar()
 
 if __name__ == "__main__":
-    do_subtraction(center_ra, center_dec)
+    #do_subtraction(center_ra, center_dec)
+    #do_subtraction(52.725246, -28.718947)
+    do_subtraction(52.716246, -28.718947)
