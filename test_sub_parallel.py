@@ -6,53 +6,55 @@ import numpy as np
 from seechange.data import FitsFile
 from matplotlib import pyplot as plt
 
-base = '/home/scpdata05/clustersn/kboone/idcsj/data/'
-
-ref_images = [
-    Image(base + 'SPARCS-J003550-431210/v1/F140W/icn199axq_pam.fits',
-          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    Image(base + 'SPARCS-J003550-431210/v1/F140W/icn199ayq_pam.fits',
-          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    Image(base + 'SPARCS-J003550-431210/v1/F140W/icn199b6q_pam.fits',
-          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11)
-]
-new_images = [
-    Image(base + 'SPARCS-J003550-431210/v2_fakes/F140W/icn173yzq_pam.fits',
-          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    Image(base + 'SPARCS-J003550-431210/v2_fakes/F140W/icn173z1q_pam.fits',
-          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    Image(base + 'SPARCS-J003550-431210/v2_fakes/F140W/icn173z3q_pam.fits',
-          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11)
-]
-
-scale_image = FitsFile.open(
-    base + 'SPARCS-J003550-431210/sets/SPARCS-J003550-431210_v1_F140W.fits',
-    readonly=True
-)
+print "Loading data"
 
 #base = '/home/scpdata05/clustersn/kboone/idcsj/data/'
 
 #ref_images = [
-    #Image(base + 'SPT0205/vC/F140W/icn112a5q_pam.fits',
+    #Image(base + 'SPARCS-J003550-431210/v1/F140W/icn199axq_pam.fits',
           #'/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    #Image(base + 'SPT0205/vC/F140W/icn112a6q_pam.fits',
+    #Image(base + 'SPARCS-J003550-431210/v1/F140W/icn199ayq_pam.fits',
           #'/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    #Image(base + 'SPT0205/vC/F140W/icn112aeq_pam.fits',
+    #Image(base + 'SPARCS-J003550-431210/v1/F140W/icn199b6q_pam.fits',
           #'/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11)
 #]
 #new_images = [
-    #Image(base + 'SPT0205/vE_fakes/F140W/icn113ymq_pam.fits',
+    #Image(base + 'SPARCS-J003550-431210/v2_fakes/F140W/icn173yzq_pam.fits',
           #'/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    #Image(base + 'SPT0205/vE_fakes/F140W/icn113yoq_pam.fits',
+    #Image(base + 'SPARCS-J003550-431210/v2_fakes/F140W/icn173z1q_pam.fits',
           #'/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
-    #Image(base + 'SPT0205/vE_fakes/F140W/icn113yqq_pam.fits',
+    #Image(base + 'SPARCS-J003550-431210/v2_fakes/F140W/icn173z3q_pam.fits',
           #'/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11)
 #]
 
 #scale_image = FitsFile.open(
-    #base + 'SPT0205/sets/SPT0205_v1_F140W.fits',
+    #base + 'SPARCS-J003550-431210/sets/SPARCS-J003550-431210_v1_F140W.fits',
     #readonly=True
 #)
+
+base = '/home/scpdata05/clustersn/kboone/idcsj/data/'
+
+ref_images = [
+    Image(base + 'SPT0205/vC/F140W/icn112a5q_pam.fits',
+          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
+    Image(base + 'SPT0205/vC/F140W/icn112a6q_pam.fits',
+          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
+    Image(base + 'SPT0205/vC/F140W/icn112aeq_pam.fits',
+          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11)
+]
+new_images = [
+    Image(base + 'SPT0205/vE_fakes/F140W/icn113ymq_pam.fits',
+          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
+    Image(base + 'SPT0205/vE_fakes/F140W/icn113yoq_pam.fits',
+          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11),
+    Image(base + 'SPT0205/vE_fakes/F140W/icn113yqq_pam.fits',
+          '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits', 11)
+]
+
+scale_image = FitsFile.open(
+    base + 'SPT0205/sets/SPT0205_v1_F140W.fits',
+    readonly=True
+)
 
 #ref_images = [
     #Image(base + 'SPARCSJ0330/v1/F105W/icn135ffq_pam.fits',
@@ -89,7 +91,7 @@ gh_spline = new_psf.get_convolution_spline(ref_psf)
 hh_spline = ref_psf.get_convolution_spline(ref_psf)
 
 
-def do_subtraction(ra, dec, radius=0.2, amp=1.0, f=0.2):
+def do_subtraction(ra, dec, radius=0.2, amp=1.0, f=0.5):
     #print "Doing subtraction for (%f, %f)" % (ra, dec)
     ref_data = np.hstack([i.find_near(ra, dec, radius) for i in ref_images])
     new_data = np.hstack([i.find_near(ra, dec, radius) for i in new_images])
@@ -98,10 +100,10 @@ def do_subtraction(ra, dec, radius=0.2, amp=1.0, f=0.2):
     new_vals, new_errs, new_psfs, new_ras, new_decs = new_data
 
     if len(ref_vals) == 0 or len(new_vals) == 0:
-        return 0
+        return (0., 0.)
 
     # TODO: Don't use data like this when estimating f. It's very wrong.
-    f = np.median(ref_vals)
+    #f = np.median(ref_vals)
     #f_gg = np.outer(new_vals, new_vals)
     #f_gh = np.outer(new_vals, ref_vals)
     #f_hh = np.outer(ref_vals, ref_vals)
@@ -149,6 +151,10 @@ def do_subtraction(ra, dec, radius=0.2, amp=1.0, f=0.2):
     t = - np.linalg.inv(2*a - 1/2.*c.dot(np.linalg.inv(d).dot(c.T))).dot(b)
     s = -1/2. * np.linalg.inv(d).dot(c.T.dot(t).T)
 
+    sub = t.dot(new_vals) - s.dot(ref_vals)
+    err = (a.dot(t).dot(t) + b.dot(t) + c.dot(s).dot(t) + d.dot(s).dot(s) +
+           amp*amp)
+
     #print "Sum of t,s: ", np.sum(t), np.sum(s)
 
     #print "Median values", np.median(new_vals), np.median(ref_vals)
@@ -163,7 +169,7 @@ def do_subtraction(ra, dec, radius=0.2, amp=1.0, f=0.2):
     #print np.mean(new_vals), np.mean(ref_vals)
     #print np.sum(t) * np.median(new_vals) - np.sum(s) * np.median(ref_vals)
 
-    return t.dot(new_vals) - s.dot(ref_vals)
+    return (sub, err)
 
 
 def do_grid(x_range, y_range, **kwargs):
@@ -172,14 +178,18 @@ def do_grid(x_range, y_range, **kwargs):
     x_grid, y_grid = np.meshgrid(x_range, y_range)
     ra_grid, dec_grid = scale_image.xy_to_rd(x_grid, y_grid)
 
-    out_grid = np.zeros(ra_grid.shape)
+    sub_grid = np.zeros(ra_grid.shape)
+    err_grid = np.zeros(ra_grid.shape)
 
     for i in range(len(x_range)):
+        print "Doing line %d of %d" % (i, len(x_range))
         for j in range(len(y_range)):
-            out_grid[j, i] = do_subtraction(ra_grid[j, i], dec_grid[j, i],
-                                            **kwargs)
+            sub, err = do_subtraction(ra_grid[j, i], dec_grid[j, i], **kwargs)
 
-    return out_grid
+            sub_grid[j, i] = sub
+            err_grid[j, i] = err
+
+    return (sub_grid, err_grid)
 
 
 def showim(data):
@@ -204,6 +214,8 @@ if __name__ == "__main__":
         print "%s [x_tile] [num_tiles_x] [y_tile] [num_tiles_y]" % args[0]
         sys.exit(1)
 
+    print "Doing tile %d %d" % (x_tile, y_tile)
+
     num_per_tile_x = naxis1 / num_tiles_x
     start_x = x_tile * num_per_tile_x + 1
     end_x = (x_tile + 1) * num_per_tile_x + 1
@@ -219,6 +231,7 @@ if __name__ == "__main__":
     x_range = np.arange(start_x, end_x)
     y_range = np.arange(start_y, end_y)
 
-    data = do_grid(x_range, y_range)
+    sub_data, err_data = do_grid(x_range, y_range)
 
-    np.save('./grid_%d_%d.npy' % (x_tile, y_tile), data)
+    np.save('./grid_sub_%d_%d.npy' % (x_tile, y_tile), sub_data)
+    np.save('./grid_err_%d_%d.npy' % (x_tile, y_tile), err_data)

@@ -1,9 +1,9 @@
-from astropy.io import fits
 from astropy.wcs import WCS
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-import astropy.units as u
 from scipy.spatial import KDTree
+
+from seechange.data import FitsFile
 
 from psfsub.psf import Psf
 
@@ -11,7 +11,7 @@ from psfsub.psf import Psf
 class Image(object):
     """Class to represent a dithered image"""
     def __init__(self, path, psf_path, psf_oversampling):
-        hdulist = fits.open(path)
+        fits_file = FitsFile.open(path, readonly=True)
 
         self.ras = []
         self.decs = []
@@ -22,10 +22,10 @@ class Image(object):
         # For now, we only support WFC3 IR images. These should already have
         # the blob flats and pixel area maps applied!
         # Note: rotation angle is counterclockwise
-        data = hdulist['SCI'].data
-        err = hdulist['ERR'].data
-        mask = hdulist['DQ'].data & ~8192
-        self.rotation_angle = hdulist['SCI'].header['ORIENTAT']
+        data = fits_file.get_data()
+        err = fits_file.get_sky_error()
+        mask = fits_file.get_mask()
+        self.rotation_angle = fits_file.get_angle()
 
         # Use a single PSF for the whole image. This can be changed to use
         # variable PSFs or something.
@@ -33,7 +33,7 @@ class Image(object):
 
         # Get a spline to do the WCS transformation. We want RA and DEC for
         # each pixel.
-        self.wcs = WCS(hdulist['SCI'].header, fobj=hdulist)
+        self.wcs = fits_file.get_wcs()
         self.center_ra, self.center_dec = self.wcs.wcs.crval
         spacing = 50
         num_y, num_x = data.shape
@@ -77,6 +77,7 @@ class Image(object):
 
         # TODO: this could work if the ra and dec were given in 2d.
         # search_around_sky is slow for single values though.
+        # import astropy.units as u
         # compare_cat = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
         # idxc, idxcat, d2d, d3d = self.catalog.search_around_sky(
         # compare_cat,
@@ -93,3 +94,31 @@ class Image(object):
 
         return (self.vals[idx], self.errs[idx], self.psfs[idx], self.ras[idx],
                 self.decs[idx])
+
+    def find_near_multi(self, ra, dec, match_dist):
+        """Find all pixels within a given distance in arcsec"""
+        # TODO: optimize this. Use an i,j box or something as an initial guess.
+        # That would probably be fast, but need to figure out how to deal with
+        # bad pixels and jank.
+
+        # TODO: this could work if the ra and dec were given in 2d.
+        # search_around_sky is slow for single values though.
+        # import astropy.units as u
+        # compare_cat = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+        # idxc, idxcat, d2d, d3d = self.catalog.search_around_sky(
+        # compare_cat,
+        # match_dist*u.arcsec
+        # )
+
+        #loc = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+        #idx = np.where(loc.separation(self.catalog) < match_dist*u.arcsec)
+
+        ra_arcsec = ra * np.cos(self.center_dec * np.pi / 180.) * 3600.
+        dec_arcsec = dec * 3600.
+
+        new_tree = KDTree(zip(ra_arcsec, dec_arcsec))
+        all_idx = self.kdtree.query_ball_tree(new_tree, match_dist)
+
+        #return (self.vals[idx], self.errs[idx], self.psfs[idx], self.ras[idx],
+                #self.decs[idx])
+        return all_idx
