@@ -248,18 +248,6 @@ class Subtractor(object):
         # Get the convolution
         psf_convolution = psf1.get_convolution_spline(psf2)
 
-        # TODO: HACK TEST!
-        #start = -1.
-        #end = 1.
-        #points = 2001
-
-        #x_range = np.linspace(start, end, points)
-        #y_range = np.linspace(start, end, points)
-
-        #x_grid, y_grid = np.meshgrid(x_range, y_range)
-
-        #psf_convolution = psf_convolution.ev(x_grid, y_grid)
-
         # Add it to the cache
         self.__psf_convolution_cache[(psf1, psf2)] = psf_convolution
 
@@ -287,25 +275,7 @@ class Subtractor(object):
                                diff_dec[offset_1:offset_1+psf_count_1,
                                         offset_2:offset_2+psf_count_2]
                            )
-                           #spline[
-                               #((diff_ra[offset_1:offset_1+psf_count_1,
-                                         #offset_2:offset_2+psf_count_2]
-                                 #+ 2.0) * (2000. / 4.0) + 0.5
-                                #).astype(np.int),
-                               #((diff_dec[offset_1:offset_1+psf_count_1,
-                                          #offset_2:offset_2+psf_count_2]
-                                #+ 2.0) * (2000. / 4.0) + 0.5
-                                #).astype(np.int),
-                           #]
                 )
-
-                #print np.min(diff_dec), np.max(diff_dec)
-                #a = ((diff_dec[offset_1:offset_1+psf_count_1,
-                               #offset_2:offset_2+psf_count_2] + 2.0)
-                     #* (999. / 4.0) + 0.5).astype(np.int),
-                #print np.min(a), np.max(a)
-
-                #from IPython import embed; embed()
 
                 offset_2 += psf_count_2
 
