@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import weakref
 from scipy.interpolate import RectBivariateSpline
@@ -20,7 +21,7 @@ class Psf(object):
         self._init = False
 
     @classmethod
-    def load(cls, path, oversampling, rotation_angle):
+    def load(cls, path, pixel_scale, oversampling, rotation_angle):
         """Open a PSF file.
 
         We use a cache so that opening the same PSF file multiple times
@@ -32,10 +33,14 @@ class Psf(object):
         rotation_angle specifies the rotation of the image counterclockwise in
         degrees.
         """
+        # Round the rotation angle to 0.1 degrees. That is accurate enough, and
+        # speeds things up by elimination a lot of minor rotations.
+        rotation_angle = np.round(rotation_angle, 1)
+
         # We optimize and return copies of the same object. This is done by
         # maintaining a cache of opened objects, and checking if it is in
         # there.
-        if path in cls.__open_files:
+        if (path, rotation_angle) in cls.__open_files:
             psf = cls.__open_files[(path, rotation_angle)]()
 
             # This only returns a weakref, which can be None!
@@ -53,6 +58,7 @@ class Psf(object):
                 return psf
 
         # Create the new object
+        print "Loading PSF %s with rotation %.1f deg" % (path, rotation_angle)
         psf = Psf()
 
         # Add it to the cache
@@ -72,35 +78,46 @@ class Psf(object):
 
         # Generate a grid of coordinates
         center_y, center_x = center_of_mass(data)
-        y_range = (np.arange(data.shape[0]) - center_y) / oversampling
-        x_range = (np.arange(data.shape[1]) - center_x) / oversampling
+        y_range = ((np.arange(data.shape[0]) - center_y) * pixel_scale /
+                   oversampling)
+        x_range = ((np.arange(data.shape[1]) - center_x) * pixel_scale /
+                   oversampling)
         x_grid, y_grid = np.meshgrid(x_range, y_range)
 
         # Generate an interpolation spline
         spline = RectBivariateSpline(x_range, y_range, convolved_data.T)
 
         # Generate the rotated data on a regular grid. These can be
-        # configured...
-        rot_x_range = np.arange(-10., 10.0001, 1/11.)
-        rot_y_range = np.arange(-10., 10.0001, 1/11.)
-        rot_x_grid, rot_y_grid = np.meshgrid(rot_x_range, rot_y_range)
+        # configured. Note that the units are in arcseconds, so we don't have
+        # to worry about spherical trig corrections.
+        # TODO: Do the bounds on this better. I want to avoid extrapolating,
+        # but I'm throwing away a bunch of data right now. Just set to 0
+        # outside of the range or something like that.
+        ra_range = np.arange(-10.*pixel_scale, 10.0001*pixel_scale,
+                             pixel_scale / oversampling)
+        dec_range = np.arange(-10.*pixel_scale, 10.0001*pixel_scale,
+                              pixel_scale / oversampling)
+        ra_grid, dec_grid = np.meshgrid(ra_range, dec_range)
 
         angle_rad = rotation_angle * np.pi / 180.
         rot_matrix = np.array([[np.cos(angle_rad), np.sin(angle_rad)],
                                [-np.sin(angle_rad), np.cos(angle_rad)]])
 
-        sample_x_grid, sample_y_grid = np.einsum(
+        sample_ra_grid, sample_dec_grid = np.einsum(
             'ji, mni -> jmn',
             rot_matrix,
-            np.dstack([rot_x_grid, rot_y_grid])
+            np.dstack([ra_grid, dec_grid])
         )
 
         psf.psf_spline = spline
-        psf.data = spline.ev(sample_x_grid, sample_y_grid)
-        psf.x_range = rot_x_range
-        psf.y_range = rot_y_range
-        psf.x_grid = rot_x_grid
-        psf.y_grid = rot_y_grid
+        psf.data = spline.ev(sample_ra_grid, sample_dec_grid)
+        psf.ra_range = ra_range
+        psf.dec_range = dec_range
+        psf.ra_grid = ra_grid
+        psf.dec_grid = dec_grid
+
+        psf.path = path
+        psf.rotation_angle = rotation_angle
 
         psf._init = True
 
@@ -108,8 +125,8 @@ class Psf(object):
 
     def get_convolution_spline(self, other_psf):
         """Generate a convolution spline (GG, GH, HH)"""
-        x_range = self.x_range
-        y_range = self.y_range
+        ra_range = self.ra_range
+        dec_range = self.dec_range
 
         data1 = self.data
         data2 = other_psf.data[::-1, ::-1]
@@ -120,6 +137,10 @@ class Psf(object):
             mode='same'
         )
 
-        spline = RectBivariateSpline(x_range, y_range, convolved_data.T)
+        spline = RectBivariateSpline(ra_range, dec_range, convolved_data.T)
 
         return spline
+
+    def __str__(self):
+        return "%s - %.1f deg" % (os.path.basename(self.path),
+                                  self.rotation_angle)
