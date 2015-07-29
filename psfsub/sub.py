@@ -165,6 +165,8 @@ class Subtractor(object):
 
         # Split up the work on all of the cores that we have available
         if num_cores > 1:
+
+        elif num_cores > 1:
             threads = []
             for i in range(num_cores):
                 num_per_core = int(np.ceil(len(y_range) / float(num_cores)))
@@ -190,9 +192,6 @@ class Subtractor(object):
                 sub_grid, err_grid, ra_grid, dec_grid, 0, len(y_range), radius
             )
 
-
-        print sub_grid
-
         #from IPython import embed; embed()
 
 
@@ -209,6 +208,8 @@ class Subtractor(object):
         #np.save('./grid_sub_%d_%d.npy' % (x_tile, y_tile), sub_data)
         #np.save('./grid_err_%d_%d.npy' % (x_tile, y_tile), err_data)
 
+        return sub_grid, err_grid
+
     __psf_convolution_cache = {}
 
     def _get_psf_convolution(self, psf1, psf2):
@@ -220,8 +221,9 @@ class Subtractor(object):
         # We optimize and return copies of the same object. This is done by
         # maintaining a cache of opened objects, and checking if it is in
         # there.
-        if (psf1, psf2) in self.__psf_convolution_cache:
-            psf_convolution = self.__psf_convolution_cache[(psf1, psf2)]
+        index = (psf1, psf2)
+        if index in self.__psf_convolution_cache:
+            psf_convolution = self.__psf_convolution_cache[index]
 
             # Make sure that it is initialized.
             scale_factor = 1.0
@@ -229,27 +231,25 @@ class Subtractor(object):
             while psf_convolution is None:
                 fail_count += 1
                 if fail_count > 5:
-                    logger.warn("Second instance of (%s, %s) convolution "
+                    logger.warn("Second instance of %s convolution "
                                 "waiting for initialization." %
-                                (psf1, psf2))
+                                (index,))
                 time.sleep(0.1*scale_factor)
                 scale_factor *= 1.2
-                psf_convolution = self.__psf_convolution_cache[
-                    (psf1, psf2)
-                ]
+                psf_convolution = self.__psf_convolution_cache[index]
 
             return psf_convolution
 
-        print "Generating convolution %s, %s" % (psf1, psf2)
+        print "Generating convolution %s" % (index,)
 
         # Mark that we are making the new object
-        self.__psf_convolution_cache[(psf1, psf2)] = None
+        self.__psf_convolution_cache[index] = None
 
         # Get the convolution
         psf_convolution = psf1.get_convolution_spline(psf2)
 
         # Add it to the cache
-        self.__psf_convolution_cache[(psf1, psf2)] = psf_convolution
+        self.__psf_convolution_cache[index] = psf_convolution
 
         return psf_convolution
 
@@ -347,10 +347,21 @@ class Subtractor(object):
 
             gsn = np.zeros(len(new_psfs))
             offset = 0
-            diff_ra = ra - new_ras
-            diff_dec = dec - new_decs
+            diff_ra = new_ras - ra
+            diff_dec = new_decs - dec
             for psf, psf_count in zip(new_psfs, new_psf_counts):
                 gsn[offset:offset+psf_count] = psf.psf_spline.ev(
+                    diff_ra[offset:offset+psf_count],
+                    diff_dec[offset:offset+psf_count]
+                )
+                offset += psf_count
+
+            hsn = np.zeros(len(ref_psfs))
+            offset = 0
+            diff_ra = ref_ras - ra
+            diff_dec = ref_decs - dec
+            for psf, psf_count in zip(ref_psfs, ref_psf_counts):
+                hsn[offset:offset+psf_count] = psf.psf_spline.ev(
                     diff_ra[offset:offset+psf_count],
                     diff_dec[offset:offset+psf_count]
                 )
@@ -359,18 +370,32 @@ class Subtractor(object):
             new_n = np.diag(new_errs**2)
             ref_n = np.diag(ref_errs**2)
 
-            f = 0.2
-            amp = 1.0
+            ref_val = hsn.dot(ref_vals) / np.sum(hsn)
+            ref_err = np.median(ref_errs)
+            new_err = np.median(new_errs)
+            #f = np.median(ref_vals) + np.median(ref_errs)
+            #amp = 5.*np.median(ref_errs) / gsn.dot(gsn)
+            if ref_val < 0:
+                ref_val = 0
+            f = ref_val + ref_err
+            amp = 5*f + 20.*new_err
+            ref_amp = amp
 
             a = gg*f**2 + amp**2 * np.outer(gsn, gsn) + new_n
             b = -2. * amp**2 * gsn
             c = -2. * gh*f**2
-            d = hh*f**2 + ref_n
+            d = hh*f**2 + ref_amp**2 * np.outer(hsn, hsn) + ref_n
+            e = -2. * ref_amp**2 * hsn
 
             d_inv = np.linalg.inv(d)
 
-            t = - np.linalg.inv(2*a - 1/2.*c.dot(d_inv.dot(c.T))).dot(b)
-            s = -1/2. * d_inv.dot(c.T.dot(t).T)
+            #t = - np.linalg.inv(2*a - 1/2.*c.dot(d_inv.dot(c.T))).dot(b)
+            #s = -1/2. * d_inv.dot(c.T.dot(t).T)
+            t = (
+                (1/2. * e.dot(d_inv).dot(c.T) - b)
+                .dot(np.linalg.inv(2.*a - 1/2.*c.dot(d_inv.dot(c.T))))
+            )
+            s = -1/2. * (t.dot(c) + e).dot(d_inv)
 
             sub = t.dot(new_vals) - s.dot(ref_vals)
             err = np.sqrt(
@@ -378,7 +403,9 @@ class Subtractor(object):
                  + b.dot(t)
                  + c.dot(s).dot(t)
                  + d.dot(s).dot(s)
-                 + amp*amp)
+                 + e.dot(s)
+                 + amp*amp
+                 + ref_amp*ref_amp)
             )
 
             sub_iter[i] = sub

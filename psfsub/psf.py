@@ -2,7 +2,7 @@ import logging
 import os
 import time
 import weakref
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RegularGridInterpolator, RectBivariateSpline
 from scipy.signal import fftconvolve
 from scipy.ndimage.measurements import center_of_mass
 import numpy as np
@@ -137,6 +137,8 @@ class Psf(object):
             mode='same'
         )
 
+        #spline = RegularGridInterpolator((ra_range, dec_range),
+                                         #convolved_data.T)
         spline = RectBivariateSpline(ra_range, dec_range, convolved_data.T)
 
         return spline
