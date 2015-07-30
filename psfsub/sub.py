@@ -128,7 +128,7 @@ class Subtractor(object):
 
         print "Done loading data"
 
-    def do_subtraction(self, num_cores=4, num_tiles_x=1, num_tiles_y=1,
+    def do_subtraction(self, num_cores=1, num_tiles_x=1, num_tiles_y=1,
                        x_tile=0, y_tile=0, radius=0.5):
         """Do the subtraction.
 
@@ -165,8 +165,6 @@ class Subtractor(object):
 
         # Split up the work on all of the cores that we have available
         if num_cores > 1:
-
-        elif num_cores > 1:
             threads = []
             for i in range(num_cores):
                 num_per_core = int(np.ceil(len(y_range) / float(num_cores)))
@@ -233,14 +231,14 @@ class Subtractor(object):
                 if fail_count > 5:
                     logger.warn("Second instance of %s convolution "
                                 "waiting for initialization." %
-                                (index,))
+                                ((str[i] for i in index),))
                 time.sleep(0.1*scale_factor)
                 scale_factor *= 1.2
                 psf_convolution = self.__psf_convolution_cache[index]
 
             return psf_convolution
 
-        print "Generating convolution %s" % (index,)
+        print "Generating convolution %s" % ((str[i] for i in index),)
 
         # Mark that we are making the new object
         self.__psf_convolution_cache[index] = None
