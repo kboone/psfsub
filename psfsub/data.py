@@ -35,16 +35,17 @@ class Image(object):
         # each pixel.
         self.wcs = fits_file.get_wcs()
         self.center_ra, self.center_dec = self.wcs.wcs.crval
-        spacing = 50
         num_y, num_x = data.shape
-        x_range = np.arange(0, num_x+spacing, spacing)
-        y_range = np.arange(0, num_y+spacing, spacing)
-        y_grid, x_grid = np.meshgrid(x_range, y_range)
+        spacing_x = np.min([50, num_x / 10])
+        spacing_y = np.min([50, num_y / 10])
+        x_range = np.arange(0, num_x+spacing_x, spacing_x)
+        y_range = np.arange(0, num_y+spacing_y, spacing_y)
+        x_grid, y_grid = np.meshgrid(x_range, y_range)
 
         ra_grid, dec_grid = self.wcs.all_pix2world(x_grid, y_grid, 0)
 
-        ra_spline = RectBivariateSpline(x_range, y_range, ra_grid)
-        dec_spline = RectBivariateSpline(x_range, y_range, dec_grid)
+        ra_spline = RectBivariateSpline(y_range, x_range, ra_grid)
+        dec_spline = RectBivariateSpline(y_range, x_range, dec_grid)
 
         eval_x = []
         eval_y = []
@@ -61,5 +62,5 @@ class Image(object):
         self.vals = np.array(self.vals)
         self.errs = np.array(self.errs)
         self.psfs = np.array(self.psfs)
-        self.ras = ra_spline.ev(eval_x, eval_y)
-        self.decs = dec_spline.ev(eval_x, eval_y)
+        self.ras = ra_spline.ev(eval_y, eval_x)
+        self.decs = dec_spline.ev(eval_y, eval_x)

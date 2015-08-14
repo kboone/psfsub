@@ -76,16 +76,16 @@ class Psf(object):
             mode='same'
         )
 
-        # Generate a grid of coordinates
+        # Generate a grid of coordinates in pixel space
         center_y, center_x = center_of_mass(data)
-        y_range = ((np.arange(data.shape[0]) - center_y) * pixel_scale /
-                   oversampling)
-        x_range = ((np.arange(data.shape[1]) - center_x) * pixel_scale /
-                   oversampling)
-        x_grid, y_grid = np.meshgrid(x_range, y_range)
+        y_pix_range = ((np.arange(data.shape[0]) - center_y) * pixel_scale /
+                       oversampling)
+        x_pix_range = ((np.arange(data.shape[1]) - center_x) * pixel_scale /
+                       oversampling)
+        x_pix_grid, y_pix_grid = np.meshgrid(x_pix_range, y_pix_range)
 
         # Generate an interpolation spline
-        spline = RectBivariateSpline(x_range, y_range, convolved_data.T)
+        spline = RectBivariateSpline(y_pix_range, x_pix_range, convolved_data)
 
         # Generate the rotated data on a regular grid. These can be
         # configured. Note that the units are in arcseconds, so we don't have
@@ -93,33 +93,42 @@ class Psf(object):
         # TODO: Do the bounds on this better. I want to avoid extrapolating,
         # but I'm throwing away a bunch of data right now. Just set to 0
         # outside of the range or something like that.
-        ra_range = np.arange(-10.*pixel_scale, 10.0001*pixel_scale,
-                             pixel_scale / oversampling)
-        dec_range = np.arange(-10.*pixel_scale, 10.0001*pixel_scale,
-                              pixel_scale / oversampling)
-        ra_grid, dec_grid = np.meshgrid(ra_range, dec_range)
+        x_range = np.arange(-10.*pixel_scale, 10.0001*pixel_scale,
+                            pixel_scale / oversampling)
+        y_range = np.arange(-10.*pixel_scale, 10.0001*pixel_scale,
+                            pixel_scale / oversampling)
+        x_grid, y_grid = np.meshgrid(x_range, y_range)
 
         angle_rad = rotation_angle * np.pi / 180.
         rot_matrix = np.array([[np.cos(angle_rad), -np.sin(angle_rad)],
                                [np.sin(angle_rad), np.cos(angle_rad)]])
 
-        sample_ra_grid, sample_dec_grid = np.einsum(
+        sample_x_grid, sample_y_grid = np.einsum(
             'ij, mni -> jmn',
             rot_matrix,
-            np.dstack([ra_grid, dec_grid])
+            np.dstack([x_grid, y_grid])
         )
 
-        psf.data = spline.ev(sample_ra_grid, sample_dec_grid)
-        psf.psf_spline = RectBivariateSpline(ra_range, dec_range, psf.data)
-        psf.ra_range = ra_range
-        psf.dec_range = dec_range
-        psf.ra_grid = ra_grid
-        psf.dec_grid = dec_grid
+        # We flip RA when evaluating here so that our coordinate system keeps
+        # pixel coordinate (0, 0) as the bottom left on the sky (where RA
+        # decreases from left to right)
+        psf.data = spline.ev(sample_y_grid, sample_x_grid)
+        psf.psf_spline = RectBivariateSpline(
+            x_range,
+            y_range,
+            psf.data
+        )
+        psf.x_range = x_range
+        psf.y_range = y_range
+        psf.x_grid = x_grid
+        psf.y_grid = y_grid
 
         psf.path = path
         psf.rotation_angle = rotation_angle
 
         psf._init = True
+
+        from IPython import embed; embed()
 
         return psf
 

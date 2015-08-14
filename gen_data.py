@@ -42,7 +42,7 @@ def psf_function(x, y):
     fwhm = 1.2
     sigma = fwhm / 2.3548
 
-    out = np.exp(-((x-0.0)**2 / (2*sigma**2/4.) + y**2 / (2*sigma**2)))
+    out = np.exp(-((x-0.5)**2 / (2*sigma**2/4.) + y**2 / (2*sigma**2)))
     out += np.exp(-((x)**2 / (2*sigma**2) + (y-0.5)**2 / (2*sigma**2/4.)))
     out /= np.sum(out)
 
