@@ -98,35 +98,34 @@ class Subtractor(object):
         self.output_wcs = output_wcs
 
         # Load all of the data.
+        # Note that we convert all of our ra and dec values into x and y
+        # coordinates in arcseconds relative to (0., 0.). We flip the x-axis so
+        # that our coordinates increase from left to right (or East to West).
         # TODO: We use double the memory that we need to currently. This should
         # be optimized to query all of the files for how many points they have,
         # and then load them one by one into preallocated arrays.
         self.ref_vals = np.hstack([i.vals for i in self.ref_images])
         self.ref_errs = np.hstack([i.errs for i in self.ref_images])
         self.ref_psfs = np.hstack([i.psfs for i in self.ref_images])
-        self.ref_ras = np.hstack([i.ras for i in self.ref_images])
-        self.ref_decs = np.hstack([i.decs for i in self.ref_images])
+        self.ref_xs = np.hstack([i.ras for i in self.ref_images])
+        self.ref_xs *= -np.cos(self.output_center_dec * np.pi / 180.) * 3600.
+        self.ref_ys = np.hstack([i.decs for i in self.ref_images])
+        self.ref_ys *= 3600.
 
         self.new_vals = np.hstack([i.vals for i in self.new_images])
         self.new_errs = np.hstack([i.errs for i in self.new_images])
         self.new_psfs = np.hstack([i.psfs for i in self.new_images])
-        self.new_ras = np.hstack([i.ras for i in self.new_images])
-        self.new_decs = np.hstack([i.decs for i in self.new_images])
-
-        # Convert the ras and decs to arcseconds. This will make all of the
-        # numbers look really weird internally, but means that we don't have to
-        # scale every time when doing comparisons.
-        self.ref_ras *= np.cos(self.output_center_dec * np.pi / 180.) * 3600.
-        self.new_ras *= np.cos(self.output_center_dec * np.pi / 180.) * 3600.
-        self.ref_decs *= 3600.
-        self.new_decs *= 3600.
+        self.new_xs = np.hstack([i.ras for i in self.new_images])
+        self.new_xs *= -np.cos(self.output_center_dec * np.pi / 180.) * 3600.
+        self.new_ys = np.hstack([i.decs for i in self.new_images])
+        self.new_ys *= 3600.
 
         # Generate KDTrees.
         # TODO: Try to use a single KDTree for both? Profile this, and if the
         # KDTree is limiting then that might be a good idea.
         print "Generating KDTrees"
-        self.ref_kdtree = cKDTree(zip(self.ref_ras, self.ref_decs))
-        self.new_kdtree = cKDTree(zip(self.new_ras, self.new_decs))
+        self.ref_kdtree = cKDTree(zip(self.ref_xs, self.ref_ys))
+        self.new_kdtree = cKDTree(zip(self.new_xs, self.new_ys))
 
         print "Done loading data"
 
@@ -141,26 +140,29 @@ class Subtractor(object):
         # Figure out the pixel indices that we need to run on. Note that the
         # indices are 1 based.
         num_per_tile_x = int(np.ceil(self.output_naxis1 / float(num_tiles_x)))
-        start_x = x_tile * num_per_tile_x + 1
-        end_x = (x_tile + 1) * num_per_tile_x + 1
-        if end_x > self.output_naxis1:
-            end_x = self.output_naxis1 + 1
+        start_pix_x = x_tile * num_per_tile_x + 1
+        end_pix_x = (x_tile + 1) * num_per_tile_x + 1
+        if end_pix_x > self.output_naxis1:
+            end_pix_x = self.output_naxis1 + 1
 
         num_per_tile_y = int(np.ceil(self.output_naxis2 / float(num_tiles_y)))
-        start_y = y_tile * num_per_tile_y + 1
-        end_y = (y_tile + 1) * num_per_tile_y + 1
-        if end_y > self.output_naxis2:
-            end_y = self.output_naxis2 + 1
+        start_pix_y = y_tile * num_per_tile_y + 1
+        end_pix_y = (y_tile + 1) * num_per_tile_y + 1
+        if end_pix_y > self.output_naxis2:
+            end_pix_y = self.output_naxis2 + 1
 
-        x_range = np.arange(start_x, end_x)
-        y_range = np.arange(start_y, end_y)
+        x_pix_range = np.arange(start_pix_x, end_pix_x)
+        y_pix_range = np.arange(start_pix_y, end_pix_y)
 
-        x_grid, y_grid = np.meshgrid(x_range, y_range)
-        ra_grid, dec_grid = self.output_wcs.all_pix2world(x_grid, y_grid, 1)
-
-        # Convert the ras and decs to arcseconds.
-        ra_grid *= np.cos(self.output_center_dec * np.pi / 180.) * 3600.
-        dec_grid *= 3600.
+        # Get the coordinates on our x/y arcsecond grid.
+        x_pix_grid, y_pix_grid = np.meshgrid(x_pix_range, y_pix_range)
+        x_grid, y_grid = self.output_wcs.all_pix2world(
+            x_pix_grid,
+            y_pix_grid,
+            1
+        )
+        x_grid *= -np.cos(self.output_center_dec * np.pi / 180.) * 3600.
+        y_grid *= 3600.
 
         # Split up the work on all of the cores that we have available
         # Note: using threads kind of sucks because the spline interpolation
@@ -170,22 +172,22 @@ class Subtractor(object):
         if num_cores > 1:
             if use_threads:
                 # Use multithreading
-                sub_grid = np.zeros(ra_grid.shape)
-                err_grid = np.zeros(ra_grid.shape)
+                sub_grid = np.zeros(x_grid.shape)
+                err_grid = np.zeros(x_grid.shape)
 
                 threads = []
                 for i in range(num_cores):
-                    num_per_core = int(np.ceil(len(y_range) /
+                    num_per_core = int(np.ceil(len(y_pix_range) /
                                                float(num_cores)))
                     core_start_index = i * num_per_core
                     core_end_index = (i + 1) * num_per_core
-                    if core_end_index > len(y_range):
-                        core_end_index = len(y_range)
+                    if core_end_index > len(y_pix_range):
+                        core_end_index = len(y_pix_range)
 
                     thread = threading.Thread(
                         target=self._do_thread_subtraction,
                         args=(sub_grid, sub_grid.shape, err_grid,
-                              err_grid.shape, ra_grid, dec_grid,
+                              err_grid.shape, x_grid, y_grid,
                               core_start_index, core_end_index, radius)
                     )
                     threads.append(thread)
@@ -198,27 +200,27 @@ class Subtractor(object):
                 # Use multiprocessing
                 processes = []
 
-                sub_grid_shared = mp.Array('d', np.product(ra_grid.shape))
-                err_grid_shared = mp.Array('d', np.product(ra_grid.shape))
+                sub_grid_shared = mp.Array('d', np.product(x_grid.shape))
+                err_grid_shared = mp.Array('d', np.product(x_grid.shape))
 
                 sub_grid = np.frombuffer(sub_grid_shared.get_obj())
-                sub_grid = sub_grid.reshape(ra_grid.shape)
+                sub_grid = sub_grid.reshape(x_grid.shape)
                 err_grid = np.frombuffer(err_grid_shared.get_obj())
-                err_grid = err_grid.reshape(ra_grid.shape)
+                err_grid = err_grid.reshape(x_grid.shape)
 
                 for i in range(num_cores):
-                    num_per_core = int(np.ceil(len(y_range) /
+                    num_per_core = int(np.ceil(len(y_pix_range) /
                                                float(num_cores)))
                     core_start_index = i * num_per_core
                     core_end_index = (i + 1) * num_per_core
-                    if core_end_index > len(y_range):
-                        core_end_index = len(y_range)
+                    if core_end_index > len(y_pix_range):
+                        core_end_index = len(y_pix_range)
 
                     process = mp.Process(
                         target=self.__class__._do_thread_subtraction,
                         args=(self, sub_grid_shared, sub_grid.shape,
-                              err_grid_shared, err_grid.shape, ra_grid,
-                              dec_grid, core_start_index, core_end_index,
+                              err_grid_shared, err_grid.shape, x_grid,
+                              y_grid, core_start_index, core_end_index,
                               radius)
                     )
                     processes.append(process)
@@ -229,12 +231,12 @@ class Subtractor(object):
                     process.join()
         else:
             # Single core, just call it directly
-            sub_grid = np.zeros(ra_grid.shape)
-            err_grid = np.zeros(ra_grid.shape)
+            sub_grid = np.zeros(x_grid.shape)
+            err_grid = np.zeros(y_grid.shape)
 
             self._do_thread_subtraction(
-                sub_grid, sub_grid.shape, err_grid, err_grid.shape, ra_grid,
-                dec_grid, 0, len(y_range), radius
+                sub_grid, sub_grid.shape, err_grid, err_grid.shape, x_grid,
+                y_grid, 0, len(y_pix_range), radius
             )
 
         np.save('./grid_sub_%d_%d.npy' % (x_tile, y_tile), sub_grid)
@@ -285,13 +287,13 @@ class Subtractor(object):
 
         return psf_convolution
 
-    def _calc_convolution_matrix(self, psfs_1, psf_counts_1, ras_1, decs_1,
-                                 psfs_2, psf_counts_2, ras_2, decs_2):
+    def _calc_convolution_matrix(self, psfs_1, psf_counts_1, xs_1, ys_1,
+                                 psfs_2, psf_counts_2, xs_2, ys_2):
         """Calculate the GG, GH, HH convolution matrices"""
 
-        diff_ra = np.subtract.outer(ras_1, ras_2)
-        diff_dec = np.subtract.outer(decs_1, decs_2)
-        matrix = np.zeros((len(ras_1), len(ras_2)))
+        diff_x = np.subtract.outer(xs_1, xs_2)
+        diff_y = np.subtract.outer(ys_1, ys_2)
+        matrix = np.zeros((len(xs_1), len(xs_2)))
 
         offset_1 = 0
         for psf_1, psf_count_1 in zip(psfs_1, psf_counts_1):
@@ -302,10 +304,10 @@ class Subtractor(object):
                 matrix[offset_1:offset_1+psf_count_1,
                        offset_2:offset_2+psf_count_2] = (
                            spline.ev(
-                               diff_ra[offset_1:offset_1+psf_count_1,
-                                       offset_2:offset_2+psf_count_2],
-                               diff_dec[offset_1:offset_1+psf_count_1,
-                                        offset_2:offset_2+psf_count_2]
+                               diff_y[offset_1:offset_1+psf_count_1,
+                                      offset_2:offset_2+psf_count_2],
+                               diff_x[offset_1:offset_1+psf_count_1,
+                                      offset_2:offset_2+psf_count_2]
                            )
                 )
 
@@ -316,7 +318,7 @@ class Subtractor(object):
         return matrix
 
     def _do_thread_subtraction(self, sub_grid, sub_grid_shape, err_grid,
-                               err_grid_shape, ra_grid, dec_grid, start_index,
+                               err_grid_shape, x_grid, y_grid, start_index,
                                end_index, radius):
         if isinstance(sub_grid, sharedctypes.SynchronizedArray):
             sub_grid = np.frombuffer(sub_grid.get_obj())
@@ -327,20 +329,20 @@ class Subtractor(object):
 
         sub_iter = sub_grid[start_index:end_index, :].flat
         err_iter = err_grid[start_index:end_index, :].flat
-        ra_iter = ra_grid[start_index:end_index, :].flat
-        dec_iter = dec_grid[start_index:end_index, :].flat
+        x_iter = x_grid[start_index:end_index, :].flat
+        y_iter = y_grid[start_index:end_index, :].flat
 
         num_pixels = len(sub_iter)
 
         print "Start/end: %d %d" % (start_index, end_index)
 
         for i in range(num_pixels):
-            ra = ra_iter[i]
-            dec = dec_iter[i]
+            x = x_iter[i]
+            y = y_iter[i]
 
             # Get all of the pixels within the desired radius
             new_idx = self.new_kdtree.query_ball_point(
-                (ra, dec), radius
+                (x, y), radius
             )
 
             new_psfs = self.new_psfs[new_idx]
@@ -348,19 +350,19 @@ class Subtractor(object):
             new_psfs = new_psfs[new_order]
             new_vals = self.new_vals[new_idx][new_order]
             new_errs = self.new_errs[new_idx][new_order]
-            new_ras = self.new_ras[new_idx][new_order]
-            new_decs = self.new_decs[new_idx][new_order]
+            new_xs = self.new_xs[new_idx][new_order]
+            new_ys = self.new_ys[new_idx][new_order]
 
             ref_idx = self.ref_kdtree.query_ball_point(
-                (ra, dec), radius
+                (x, y), radius
             )
 
             ref_psfs = self.ref_psfs[ref_idx]
             ref_order = ref_psfs.argsort()
             ref_vals = self.ref_vals[ref_idx][ref_order]
             ref_errs = self.ref_errs[ref_idx][ref_order]
-            ref_ras = self.ref_ras[ref_idx][ref_order]
-            ref_decs = self.ref_decs[ref_idx][ref_order]
+            ref_xs = self.ref_xs[ref_idx][ref_order]
+            ref_ys = self.ref_ys[ref_idx][ref_order]
 
             # Skip if there wasn't anything
             if len(ref_psfs) == 0 or len(new_psfs) == 0:
@@ -379,37 +381,37 @@ class Subtractor(object):
                 return_counts=True
             )
             gg = self._calc_convolution_matrix(
-                new_psfs, new_psf_counts, new_ras, new_decs,
-                new_psfs, new_psf_counts, new_ras, new_decs
+                new_psfs, new_psf_counts, new_xs, new_ys,
+                new_psfs, new_psf_counts, new_xs, new_ys
             )
             gh = self._calc_convolution_matrix(
-                new_psfs, new_psf_counts, new_ras, new_decs,
-                ref_psfs, ref_psf_counts, ref_ras, ref_decs
+                new_psfs, new_psf_counts, new_xs, new_ys,
+                ref_psfs, ref_psf_counts, ref_xs, ref_ys
             )
             hh = self._calc_convolution_matrix(
-                ref_psfs, ref_psf_counts, ref_ras, ref_decs,
-                ref_psfs, ref_psf_counts, ref_ras, ref_decs
+                ref_psfs, ref_psf_counts, ref_xs, ref_ys,
+                ref_psfs, ref_psf_counts, ref_xs, ref_ys
             )
 
             gsn = np.zeros(len(new_psfs))
             offset = 0
-            diff_ra = new_ras - ra
-            diff_dec = new_decs - dec
+            diff_x = new_xs - x
+            diff_y = new_ys - y
             for psf, psf_count in zip(new_psfs, new_psf_counts):
                 gsn[offset:offset+psf_count] = psf.psf_spline.ev(
-                    diff_ra[offset:offset+psf_count],
-                    diff_dec[offset:offset+psf_count]
+                    diff_y[offset:offset+psf_count],
+                    diff_x[offset:offset+psf_count]
                 )
                 offset += psf_count
 
             hsn = np.zeros(len(ref_psfs))
             offset = 0
-            diff_ra = ref_ras - ra
-            diff_dec = ref_decs - dec
+            diff_x = ref_xs - x
+            diff_y = ref_ys - y
             for psf, psf_count in zip(ref_psfs, ref_psf_counts):
                 hsn[offset:offset+psf_count] = psf.psf_spline.ev(
-                    diff_ra[offset:offset+psf_count],
-                    diff_dec[offset:offset+psf_count]
+                    diff_y[offset:offset+psf_count],
+                    diff_x[offset:offset+psf_count]
                 )
                 offset += psf_count
 
@@ -453,8 +455,6 @@ class Subtractor(object):
                  + amp*amp
                  + ref_amp*ref_amp)
             )
-
-            #from IPython import embed; embed()
 
             sub_iter[i] = sub
             err_iter[i] = err

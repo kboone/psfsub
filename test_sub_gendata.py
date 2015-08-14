@@ -9,15 +9,15 @@ psf = base + 'gen_psf.fits'
 
 s = Subtractor()
 
+s.add_reference(base + 'gen_dither_0.fits', psf, 11)
 s.add_reference(base + 'gen_dither_1.fits', psf, 11)
 s.add_reference(base + 'gen_dither_2.fits', psf, 11)
 s.add_reference(base + 'gen_dither_3.fits', psf, 11)
 s.add_reference(base + 'gen_dither_4.fits', psf, 11)
 s.add_reference(base + 'gen_dither_5.fits', psf, 11)
-s.add_reference(base + 'gen_dither_6.fits', psf, 11)
+s.add_new(base + 'gen_dither_6.fits', psf, 11)
 s.add_new(base + 'gen_dither_7.fits', psf, 11)
 s.add_new(base + 'gen_dither_8.fits', psf, 11)
-s.add_new(base + 'gen_dither_9.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vD/F140W/icn10dfmq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vD/F140W/icn10dfoq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vE/F140W/icn113ymq_pam.fits', psf, 11)
@@ -26,7 +26,7 @@ s.add_new(base + 'gen_dither_9.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfmq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfoq_pam.fits', psf, 11)
 
-s.read_output_coordinates(base + 'gen_dither_1.fits')
+s.read_output_coordinates(base + 'gen_dither_1.fits', 'PRIMARY')
 
 s.output_naxis1 = 150
 s.output_naxis2 = 150

@@ -113,14 +113,15 @@ for i, dither_data in enumerate(dithers):
     x_offset, y_offset, rotation_angle, is_reference = dither_data
     print "Generating image %d" % i
 
-    # Counter-clockwise rotation
+    # Generate a rotation matrix for the given angle. We generate a clockwise
+    # rotation matrix since the specified rotation angle is counter-clockwise
     angle_rad = rotation_angle * np.pi / 180.
-    rot_matrix = np.array([[np.cos(angle_rad), -np.sin(angle_rad)],
-                           [np.sin(angle_rad), np.cos(angle_rad)]])
+    cw_rot_matrix = np.array([[np.cos(angle_rad), np.sin(angle_rad)],
+                              [-np.sin(angle_rad), np.cos(angle_rad)]])
 
     rot_x_grid, rot_y_grid = np.einsum(
         'ij, mni -> jmn',
-        rot_matrix,
+        cw_rot_matrix,
         np.dstack([data_x_grid, data_y_grid])
     )
 
@@ -142,8 +143,8 @@ for i, dither_data in enumerate(dithers):
     dither_data = spline(sample_y_range, sample_x_range)
 
     # Generate the WCS
-    inv_rot_matrix = np.linalg.inv(rot_matrix)
-    ra_offset, dec_offset = inv_rot_matrix.dot([x_offset, y_offset])
+    ccw_rot_matrix = np.linalg.inv(cw_rot_matrix)
+    ra_offset, dec_offset = ccw_rot_matrix.dot([x_offset, y_offset])
     dither_wcs = WCS(naxis=2)
     dither_wcs.wcs.crpix = [size_x / 2., size_y / 2.]
     dither_center_ra = (
@@ -154,7 +155,7 @@ for i, dither_data in enumerate(dithers):
     dither_wcs.wcs.crval = [dither_center_ra, dither_center_dec]
     dither_wcs.wcs.cdelt = np.array([-pixel_scale, pixel_scale]) / 3600.
     dither_wcs.wcs.ctype = ['RA---TAN', 'DEC--TAN']
-    dither_wcs.wcs.pc = inv_rot_matrix
+    dither_wcs.wcs.pc = ccw_rot_matrix
 
     # Write the output data to a fits file
     dither_header = dither_wcs.to_header()

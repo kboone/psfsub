@@ -38,14 +38,14 @@ class Image(object):
         num_y, num_x = data.shape
         spacing_x = np.min([50, num_x / 10])
         spacing_y = np.min([50, num_y / 10])
-        x_range = np.arange(0, num_x+spacing_x, spacing_x)
-        y_range = np.arange(0, num_y+spacing_y, spacing_y)
-        x_grid, y_grid = np.meshgrid(x_range, y_range)
+        rd_x_range = np.arange(0, num_x+spacing_x, spacing_x)
+        rd_y_range = np.arange(0, num_y+spacing_y, spacing_y)
+        rd_x_grid, rd_y_grid = np.meshgrid(rd_x_range, rd_y_range)
 
-        ra_grid, dec_grid = self.wcs.all_pix2world(x_grid, y_grid, 0)
+        ra_grid, dec_grid = self.wcs.all_pix2world(rd_x_grid, rd_y_grid, 0)
 
-        ra_spline = RectBivariateSpline(y_range, x_range, ra_grid)
-        dec_spline = RectBivariateSpline(y_range, x_range, dec_grid)
+        ra_spline = RectBivariateSpline(rd_y_range, rd_x_range, ra_grid)
+        dec_spline = RectBivariateSpline(rd_y_range, rd_x_range, dec_grid)
 
         eval_x = []
         eval_y = []

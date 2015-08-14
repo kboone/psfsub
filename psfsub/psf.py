@@ -128,14 +128,12 @@ class Psf(object):
 
         psf._init = True
 
-        from IPython import embed; embed()
-
         return psf
 
     def get_convolution_spline(self, other_psf):
         """Generate a convolution spline (GG, GH, HH)"""
-        ra_range = self.ra_range
-        dec_range = self.dec_range
+        x_range = self.x_range
+        y_range = self.y_range
 
         data1 = self.data
         data2 = other_psf.data[::-1, ::-1]
@@ -148,7 +146,7 @@ class Psf(object):
 
         #spline = RegularGridInterpolator((ra_range, dec_range),
                                          #convolved_data.T)
-        spline = RectBivariateSpline(ra_range, dec_range, convolved_data.T)
+        spline = RectBivariateSpline(y_range, x_range, convolved_data)
 
         return spline
 
