@@ -1,5 +1,7 @@
 import numpy as np
 import threading
+import multiprocessing as mp
+from multiprocessing import sharedctypes
 import logging
 import time
 from astropy.io import fits
@@ -128,8 +130,8 @@ class Subtractor(object):
 
         print "Done loading data"
 
-    def do_subtraction(self, num_cores=1, num_tiles_x=1, num_tiles_y=1,
-                       x_tile=0, y_tile=0, radius=0.5):
+    def do_subtraction(self, num_cores=24, num_tiles_x=1, num_tiles_y=1,
+                       x_tile=0, y_tile=0, radius=0.3):
         """Do the subtraction.
 
         This can be done with tiles to easily split the work between different
@@ -160,51 +162,83 @@ class Subtractor(object):
         ra_grid *= np.cos(self.output_center_dec * np.pi / 180.) * 3600.
         dec_grid *= 3600.
 
-        sub_grid = np.zeros(ra_grid.shape)
-        err_grid = np.zeros(ra_grid.shape)
-
         # Split up the work on all of the cores that we have available
+        # Note: using threads kind of sucks because the spline interpolation
+        # which is our time limiting factor doesn't disable the GIL. Only
+        # processes actually work for speedup now.
+        use_threads = False
         if num_cores > 1:
-            threads = []
-            for i in range(num_cores):
-                num_per_core = int(np.ceil(len(y_range) / float(num_cores)))
-                core_start_index = i * num_per_core
-                core_end_index = (i + 1) * num_per_core
-                if core_end_index > len(y_range):
-                    core_end_index = len(y_range)
+            if use_threads:
+                # Use multithreading
+                sub_grid = np.zeros(ra_grid.shape)
+                err_grid = np.zeros(ra_grid.shape)
 
-                thread = threading.Thread(
-                    target=self._do_thread_subtraction,
-                    args=(sub_grid, err_grid, ra_grid, dec_grid,
-                          core_start_index, core_end_index, radius)
-                )
-                threads.append(thread)
-                thread.start()
+                threads = []
+                for i in range(num_cores):
+                    num_per_core = int(np.ceil(len(y_range) /
+                                               float(num_cores)))
+                    core_start_index = i * num_per_core
+                    core_end_index = (i + 1) * num_per_core
+                    if core_end_index > len(y_range):
+                        core_end_index = len(y_range)
 
-            # Wait for our threads to end
-            for thread in threads:
-                thread.join()
+                    thread = threading.Thread(
+                        target=self._do_thread_subtraction,
+                        args=(sub_grid, sub_grid.shape, err_grid,
+                              err_grid.shape, ra_grid, dec_grid,
+                              core_start_index, core_end_index, radius)
+                    )
+                    threads.append(thread)
+                    thread.start()
+
+                # Wait for our threads to end
+                for thread in threads:
+                    thread.join()
+            else:
+                # Use multiprocessing
+                processes = []
+
+                sub_grid_shared = mp.Array('d', np.product(ra_grid.shape))
+                err_grid_shared = mp.Array('d', np.product(ra_grid.shape))
+
+                sub_grid = np.frombuffer(sub_grid_shared.get_obj())
+                sub_grid = sub_grid.reshape(ra_grid.shape)
+                err_grid = np.frombuffer(err_grid_shared.get_obj())
+                err_grid = err_grid.reshape(ra_grid.shape)
+
+                for i in range(num_cores):
+                    num_per_core = int(np.ceil(len(y_range) /
+                                               float(num_cores)))
+                    core_start_index = i * num_per_core
+                    core_end_index = (i + 1) * num_per_core
+                    if core_end_index > len(y_range):
+                        core_end_index = len(y_range)
+
+                    process = mp.Process(
+                        target=self.__class__._do_thread_subtraction,
+                        args=(self, sub_grid_shared, sub_grid.shape,
+                              err_grid_shared, err_grid.shape, ra_grid,
+                              dec_grid, core_start_index, core_end_index,
+                              radius)
+                    )
+                    processes.append(process)
+                    process.start()
+
+                # Wait for our threads to end
+                for process in processes:
+                    process.join()
         else:
             # Single core, just call it directly
+            sub_grid = np.zeros(ra_grid.shape)
+            err_grid = np.zeros(ra_grid.shape)
+
             self._do_thread_subtraction(
-                sub_grid, err_grid, ra_grid, dec_grid, 0, len(y_range), radius
+                sub_grid, sub_grid.shape, err_grid, err_grid.shape, ra_grid,
+                dec_grid, 0, len(y_range), radius
             )
 
-        #from IPython import embed; embed()
-
-
-        #for i in range(len(x_range)):
-            #print "Doing line %d of %d" % (i, len(x_range))
-            #for j in range(len(y_range)):
-                #sub, err = do_subtraction(ra_grid[j, i], dec_grid[j, i], **kwargs)
-
-                #sub_grid[j, i] = sub
-                #err_grid[j, i] = err
-
-        #sub_data, err_data = do_grid(x_range, y_range)
-
-        #np.save('./grid_sub_%d_%d.npy' % (x_tile, y_tile), sub_data)
-        #np.save('./grid_err_%d_%d.npy' % (x_tile, y_tile), err_data)
+        np.save('./grid_sub_%d_%d.npy' % (x_tile, y_tile), sub_grid)
+        np.save('./grid_err_%d_%d.npy' % (x_tile, y_tile), err_grid)
 
         return sub_grid, err_grid
 
@@ -238,7 +272,7 @@ class Subtractor(object):
 
             return psf_convolution
 
-        print "Generating convolution %s" % ((str[i] for i in index),)
+        # print "Generating convolution %s" % ((str[i] for i in index),)
 
         # Mark that we are making the new object
         self.__psf_convolution_cache[index] = None
@@ -281,8 +315,16 @@ class Subtractor(object):
 
         return matrix
 
-    def _do_thread_subtraction(self, sub_grid, err_grid, ra_grid, dec_grid,
-                               start_index, end_index, radius):
+    def _do_thread_subtraction(self, sub_grid, sub_grid_shape, err_grid,
+                               err_grid_shape, ra_grid, dec_grid, start_index,
+                               end_index, radius):
+        if isinstance(sub_grid, sharedctypes.SynchronizedArray):
+            sub_grid = np.frombuffer(sub_grid.get_obj())
+            sub_grid = sub_grid.reshape(sub_grid_shape)
+        if isinstance(err_grid, sharedctypes.SynchronizedArray):
+            err_grid = np.frombuffer(err_grid.get_obj())
+            err_grid = err_grid.reshape(err_grid_shape)
+
         sub_iter = sub_grid[start_index:end_index, :].flat
         err_iter = err_grid[start_index:end_index, :].flat
         ra_iter = ra_grid[start_index:end_index, :].flat
@@ -319,6 +361,12 @@ class Subtractor(object):
             ref_errs = self.ref_errs[ref_idx][ref_order]
             ref_ras = self.ref_ras[ref_idx][ref_order]
             ref_decs = self.ref_decs[ref_idx][ref_order]
+
+            # Skip if there wasn't anything
+            if len(ref_psfs) == 0 or len(new_psfs) == 0:
+                sub_iter[i] = 0.
+                err_iter[i] = 0.
+                continue
 
             # Calculate the GG, GH and HH matrices. Note that we have
             # everything grouped by PSF for speed.
@@ -406,5 +454,17 @@ class Subtractor(object):
                  + ref_amp*ref_amp)
             )
 
+            #from IPython import embed; embed()
+
             sub_iter[i] = sub
             err_iter[i] = err
+
+            #center_ra = (self.output_center_ra
+                         #* np.cos(self.output_center_dec * np.pi / 180.)
+                         #* 3600.)
+            #center_dec = self.output_center_dec * 3600.
+            #psf = new_psfs[0]
+            #sub_iter[i] += 1000*psf.psf_spline.ev(ra - center_ra, dec
+                                                 #- center_dec)
+
+        #print sub_grid

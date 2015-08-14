@@ -2,7 +2,7 @@ from psfsub import Subtractor
 import cProfile
 import pstats
 
-base = '/home/scpdata05/clustersn/kboone/idcsj/data/'
+base = '/home/kboone/optimal_subtraction/psfsub/test_bob_1'
 
 psf = '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits'
 

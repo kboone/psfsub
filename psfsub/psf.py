@@ -100,17 +100,17 @@ class Psf(object):
         ra_grid, dec_grid = np.meshgrid(ra_range, dec_range)
 
         angle_rad = rotation_angle * np.pi / 180.
-        rot_matrix = np.array([[np.cos(angle_rad), np.sin(angle_rad)],
-                               [-np.sin(angle_rad), np.cos(angle_rad)]])
+        rot_matrix = np.array([[np.cos(angle_rad), -np.sin(angle_rad)],
+                               [np.sin(angle_rad), np.cos(angle_rad)]])
 
         sample_ra_grid, sample_dec_grid = np.einsum(
-            'ji, mni -> jmn',
+            'ij, mni -> jmn',
             rot_matrix,
             np.dstack([ra_grid, dec_grid])
         )
 
-        psf.psf_spline = spline
         psf.data = spline.ev(sample_ra_grid, sample_dec_grid)
+        psf.psf_spline = RectBivariateSpline(ra_range, dec_range, psf.data)
         psf.ra_range = ra_range
         psf.dec_range = dec_range
         psf.ra_grid = ra_grid
