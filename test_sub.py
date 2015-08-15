@@ -28,8 +28,8 @@ s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113yqq_pam.fits', psf, 11)
 
 s.read_output_coordinates(base + 'SPT0205/sets/SPT0205_v1_F140W.fits')
 
-s.output_naxis1 = 100
-s.output_naxis2 = 100
+s.output_naxis1 = 200
+s.output_naxis2 = 200
 
 #s.output_center_ra = 31.414949
 #s.output_center_dec = -58.493038

@@ -109,13 +109,10 @@ class Psf(object):
             np.dstack([x_grid, y_grid])
         )
 
-        # We flip RA when evaluating here so that our coordinate system keeps
-        # pixel coordinate (0, 0) as the bottom left on the sky (where RA
-        # decreases from left to right)
         psf.data = spline.ev(sample_y_grid, sample_x_grid)
         psf.psf_spline = RectBivariateSpline(
-            x_range,
             y_range,
+            x_range,
             psf.data
         )
         psf.x_range = x_range

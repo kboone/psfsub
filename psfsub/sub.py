@@ -130,7 +130,7 @@ class Subtractor(object):
         print "Done loading data"
 
     def do_subtraction(self, num_cores=1, num_tiles_x=1, num_tiles_y=1,
-                       x_tile=0, y_tile=0, radius=0.3):
+                       x_tile=0, y_tile=0, radius=0.2):
         """Do the subtraction.
 
         This can be done with tiles to easily split the work between different

@@ -32,6 +32,8 @@ pixel_scale = 0.13
 center_ra = 30.0
 center_dec = 30.0
 
+noise_sigma = 0.01
+
 oversampling = 11.
 psf_x_max = 15.
 psf_y_max = 17.
@@ -42,6 +44,7 @@ def psf_function(x, y):
     fwhm = 1.2
     sigma = fwhm / 2.3548
 
+    #out = np.exp(-x**2 / (2*sigma**2) + -y**2 / (2*sigma**2))
     out = np.exp(-((x-0.5)**2 / (2*sigma**2/4.) + y**2 / (2*sigma**2)))
     out += np.exp(-((x)**2 / (2*sigma**2) + (y-0.5)**2 / (2*sigma**2/4.)))
     out /= np.sum(out)
@@ -136,11 +139,14 @@ for i, dither_data in enumerate(dithers):
     spline = RectBivariateSpline(data_y_range, data_x_range, psf_applied_data)
 
     # Sample the data
-    sample_x_range = np.arange(-size_x/2. + 0.5 + x_offset, size_x/2. + 0.5 +
+    sample_x_range = np.arange(-size_x/2. + 1.0 + x_offset, size_x/2. + 1.0 +
                                x_offset)
-    sample_y_range = np.arange(-size_y/2. + 0.5 + y_offset, size_y/2. + 0.5 +
+    sample_y_range = np.arange(-size_y/2. + 1.0 + y_offset, size_y/2. + 1.0 +
                                y_offset)
     dither_data = spline(sample_y_range, sample_x_range)
+
+    # Add noise
+    dither_data += np.random.normal(scale=noise_sigma, size=dither_data.shape)
 
     # Generate the WCS
     ccw_rot_matrix = np.linalg.inv(cw_rot_matrix)
