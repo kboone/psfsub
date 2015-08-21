@@ -2,7 +2,11 @@ from psfsub import Subtractor
 import cProfile
 import pstats
 
-base = '/home/kboone/optimal_subtraction/psfsub/test_bob_1/'
+#base = '/home/kboone/optimal_subtraction/psfsub/test_bob_5/'
+#base = './'
+base = '/home/kboone/optimal_subtraction/psfsub/test_stats_1/'
+
+print "Running on %s" % base
 
 psf = base + 'gen_psf.fits'
 

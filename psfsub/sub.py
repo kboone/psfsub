@@ -129,8 +129,8 @@ class Subtractor(object):
 
         print "Done loading data"
 
-    def do_subtraction(self, num_cores=1, num_tiles_x=1, num_tiles_y=1,
-                       x_tile=0, y_tile=0, radius=0.2):
+    def do_subtraction(self, num_cores=8, num_tiles_x=1, num_tiles_y=1,
+                       x_tile=0, y_tile=0, radius=0.3):
         """Do the subtraction.
 
         This can be done with tiles to easily split the work between different
@@ -425,9 +425,10 @@ class Subtractor(object):
             #amp = 5.*np.median(ref_errs) / gsn.dot(gsn)
             if ref_val < 0:
                 ref_val = 0
-            f = ref_val + ref_err
-            amp = 5*f + 20.*new_err
-            ref_amp = amp
+            f = (ref_val)
+            amp = ref_val + 1.0 #ref_val + ref_err + new_err
+            #ref_amp = amp
+            ref_amp = 0.
 
             a = gg*f**2 + amp**2 * np.outer(gsn, gsn) + new_n
             b = -2. * amp**2 * gsn

@@ -32,7 +32,7 @@ pixel_scale = 0.13
 center_ra = 30.0
 center_dec = 30.0
 
-noise_sigma = 0.01
+noise_sigma = 0.1
 
 oversampling = 11.
 psf_x_max = 15.
@@ -40,26 +40,68 @@ psf_y_max = 17.
 prefix = 'gen'
 
 
-def psf_function(x, y):
-    fwhm = 1.2
-    sigma = fwhm / 2.3548
+psf_mode = 1
 
-    #out = np.exp(-x**2 / (2*sigma**2) + -y**2 / (2*sigma**2))
-    out = np.exp(-((x-0.5)**2 / (2*sigma**2/4.) + y**2 / (2*sigma**2)))
-    out += np.exp(-((x)**2 / (2*sigma**2) + (y-0.5)**2 / (2*sigma**2/4.)))
-    out /= np.sum(out)
+if psf_mode == 0:
+    # Made up asymmetrical PSF
+    def psf_function(x, y):
+        fwhm = 1.2
+        sigma = fwhm / 2.3548
 
-    return out
+        #out = np.exp(-x**2 / (2*sigma**2) + -y**2 / (2*sigma**2))
+        out = np.exp(-((x-0.5)**2 / (2*sigma**2/4.) + y**2 / (2*sigma**2)))
+        out += np.exp(-((x)**2 / (2*sigma**2) + (y-0.5)**2 / (2*sigma**2/4.)))
+        out /= np.sum(out)
+
+        return out
+
+elif psf_mode == 1:
+    # Load the PSF from a file instead.
+    hdulist = fits.open(
+        '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits'
+    )
+    psf_read_data = hdulist[0].data
+
+    psf_len_x, psf_len_y = psf_read_data.shape
+
+    psf_read_x_range = ((np.arange(psf_len_x) - psf_len_x / 2.) / 11.)
+    psf_read_y_range = ((np.arange(psf_len_x) - psf_len_x / 2.) / 11.)
+
+    psf_read_spline = RectBivariateSpline(psf_read_y_range, psf_read_x_range,
+                                          psf_read_data)
+
+    def psf_function(x, y):
+        return psf_read_spline.ev(y, x)
 
 
-def data_function(x, y):
+def data_function(x, y, is_reference):
     fwhm = 20.
     sigma = fwhm / 2.3548
-
     out = 0.05*np.exp(-((x+10)**2 / (2*sigma**2/2.) + y**2 / (2*sigma**2)))
+
+    fwhm = 4.
+    sigma = fwhm / 2.3548
+    out += 0.05*np.exp(-((x+20)**2 / (2*sigma**2/2.) + y**2 / (2*sigma**2)))
+
+    fwhm = 2.
+    sigma = fwhm / 2.3548
+    out += 0.1*np.exp(-((x+20)**2 / (2*sigma**2/2.) + (y-20)**2 / (2*sigma**2)))
+
+    fwhm = 2.
+    sigma = fwhm / 2.3548
+    out += 0.1*np.exp(-((x+20)**2 / (2*sigma**2/2.) + (y+20)**2 / (2*sigma**2)))
+
     out += 0.1*np.exp(-((x-20)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
     out += 0.5*np.exp(-((x-30)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
     out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-5)**2 / (2*0.1**2)))
+
+    if not is_reference:
+        #out += 1.0*np.exp(-((x)**2 / (2*0.1**2) + (y-20)**2 / (2*0.1**2)))
+        #out += 0.5*np.exp(-((x)**2 / (2*0.1**2) + (y-10)**2 / (2*0.1**2)))
+        out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-0)**2 / (2*0.1**2)))
+        #out += 0.1*np.exp(-((x)**2 / (2*0.1**2) + (y+10)**2 / (2*0.1**2)))
+        #out += 0.05*np.exp(-((x)**2 / (2*0.1**2) + (y+20)**2 / (2*0.1**2)))
+        #out += 0.5*np.exp(-((x+20)**2 / (2*0.1**2) + (y-0)**2 / (2*0.1**2)))
 
     return out
 
@@ -82,6 +124,7 @@ psf_data = psf_function(psf_x_grid, psf_y_grid)
 center_y, center_x = center_of_mass(psf_data)
 shift_x = center_x / oversampling - psf_x_max
 shift_y = center_y / oversampling - psf_y_max
+print "Shifting by x=%.2f, y=%.2f" % (shift_x, shift_y)
 psf_data = psf_function(psf_x_grid + shift_x, psf_y_grid + shift_y)
 
 # Write the PSF to a fits file
@@ -129,7 +172,7 @@ for i, dither_data in enumerate(dithers):
     )
 
     # Generate data and convolve with the PSF
-    rot_data = data_function(rot_x_grid, rot_y_grid)
+    rot_data = data_function(rot_x_grid, rot_y_grid, is_reference)
     psf_applied_data = fftconvolve(
         rot_data,
         conv_psf_data,

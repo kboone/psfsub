@@ -23,13 +23,16 @@ class Image(object):
         # Note: rotation angle is counterclockwise
         data = fits_file.get_data()
         err = fits_file.get_sky_error()
+        #err = fits_file.get_error()
+        #err = fits_file.hdulist['ERR'].data
         mask = fits_file.get_mask()
         self.rotation_angle = fits_file.get_angle()
 
         # Use a single PSF for the whole image. This can be changed to use
         # variable PSFs or something.
-        psf = Psf.load(psf_path, fits_file.pixel_scale, psf_oversampling,
-                       self.rotation_angle)
+        pixel_scale_x, pixel_scale_y = fits_file.get_axis_pixel_scales()
+        psf = Psf.load(psf_path, pixel_scale_x, pixel_scale_y,
+                       psf_oversampling, self.rotation_angle)
 
         # Get a spline to do the WCS transformation. We want RA and DEC for
         # each pixel.

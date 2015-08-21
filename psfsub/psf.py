@@ -21,7 +21,8 @@ class Psf(object):
         self._init = False
 
     @classmethod
-    def load(cls, path, pixel_scale, oversampling, rotation_angle):
+    def load(cls, path, pixel_scale_x, pixel_scale_y, oversampling,
+             rotation_angle):
         """Open a PSF file.
 
         We use a cache so that opening the same PSF file multiple times
@@ -76,13 +77,14 @@ class Psf(object):
             mode='same'
         )
 
-        # Generate a grid of coordinates in pixel space
+        # Generate a grid of coordinates in arcsecond space
         center_y, center_x = center_of_mass(data)
-        y_pix_range = ((np.arange(data.shape[0]) - center_y) * pixel_scale /
+        y_pix_range = ((np.arange(data.shape[0]) - center_y) * pixel_scale_y /
                        oversampling)
-        x_pix_range = ((np.arange(data.shape[1]) - center_x) * pixel_scale /
+        x_pix_range = ((np.arange(data.shape[1]) - center_x) * pixel_scale_x /
                        oversampling)
         x_pix_grid, y_pix_grid = np.meshgrid(x_pix_range, y_pix_range)
+        pixel_scale = (pixel_scale_x + pixel_scale_y) / 2.
 
         # Generate an interpolation spline
         spline = RectBivariateSpline(y_pix_range, x_pix_range, convolved_data)
