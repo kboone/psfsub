@@ -42,6 +42,13 @@ prefix = 'gen'
 
 psf_mode = 1
 
+
+def gauss2d(amp, center_x, center_y, sigma_x, sigma_y, x, y):
+    norm = amp / (2. * np.pi * sigma_x * sigma_y) / oversampling / oversampling
+    func = np.exp(-((x-center_x)**2 / (2.*sigma_x**2) + (y-center_y)**2 /
+                    (2.*sigma_y**2)))
+    return norm * func
+
 if psf_mode == 0:
     # Made up asymmetrical PSF
     def psf_function(x, y):
@@ -97,11 +104,12 @@ def data_function(x, y, is_reference):
 
     if not is_reference:
         #out += 1.0*np.exp(-((x)**2 / (2*0.1**2) + (y-20)**2 / (2*0.1**2)))
-        #out += 0.5*np.exp(-((x)**2 / (2*0.1**2) + (y-10)**2 / (2*0.1**2)))
-        out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-0)**2 / (2*0.1**2)))
-        #out += 0.1*np.exp(-((x)**2 / (2*0.1**2) + (y+10)**2 / (2*0.1**2)))
-        #out += 0.05*np.exp(-((x)**2 / (2*0.1**2) + (y+20)**2 / (2*0.1**2)))
-        #out += 0.5*np.exp(-((x+20)**2 / (2*0.1**2) + (y-0)**2 / (2*0.1**2)))
+        out += gauss2d(4.0, 0., 20., 0.1, 0.1, x, y)
+        out += gauss2d(2.0, 0., 10., 0.1, 0.1, x, y)
+        out += gauss2d(1.0, 0., 0., 0.1, 0.1, x, y)
+        out += gauss2d(0.5, 0., -10., 0.1, 0.1, x, y)
+        out += gauss2d(0.25, 0., -20., 0.1, 0.1, x, y)
+        out += 0.5*np.exp(-((x+20)**2 / (2*0.1**2) + (y-0)**2 / (2*0.1**2)))
 
     return out
 

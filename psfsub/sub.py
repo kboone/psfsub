@@ -129,7 +129,7 @@ class Subtractor(object):
 
         print "Done loading data"
 
-    def do_subtraction(self, num_cores=8, num_tiles_x=1, num_tiles_y=1,
+    def do_subtraction(self, num_cores=24, num_tiles_x=1, num_tiles_y=1,
                        x_tile=0, y_tile=0, radius=0.3):
         """Do the subtraction.
 
@@ -245,6 +245,7 @@ class Subtractor(object):
         return sub_grid, err_grid
 
     __psf_convolution_cache = {}
+    __psf_taylor_cache = {}
 
     def _get_psf_convolution(self, psf1, psf2):
         """Get the convolution of two PSFs.
@@ -287,6 +288,64 @@ class Subtractor(object):
 
         return psf_convolution
 
+    def _get_psf_taylor_spline(self, psf, order_x, order_y):
+        """Get the convolution of a PSF with (x^order_x*y^order_y)
+
+        We use a cache so that calling this multiple times actually returns the
+        same object.
+        """
+        # We optimize and return copies of the same object. This is done by
+        # maintaining a cache of opened objects, and checking if it is in
+        # there.
+        index = (psf, order_x, order_y)
+        if index in self.__psf_taylor_cache:
+            spline = self.__psf_taylor_cache[index]
+
+            # Make sure that it is initialized.
+            scale_factor = 1.0
+            fail_count = 0
+            while spline is None:
+                fail_count += 1
+                if fail_count > 5:
+                    logger.warn("Second instance of %s convolution "
+                                "waiting for initialization." %
+                                ((str[i] for i in index),))
+                time.sleep(0.1*scale_factor)
+                scale_factor *= 1.2
+                spline = self.__psf_taylor_cache[index]
+
+            return spline
+
+        # print "Generating convolution %s" % ((str[i] for i in index),)
+
+        # Mark that we are making the new object
+        self.__psf_taylor_cache[index] = None
+
+        # Get the convolution
+        spline = psf.get_taylor_spline(order_x, order_y)
+
+        # Add it to the cache
+        self.__psf_taylor_cache[index] = spline
+
+        return spline
+
+    def _calc_psf_taylor_vector(self, psfs, psf_counts, xs, ys, center_x,
+                                center_y, order_x, order_y):
+        """Calculate the PSF Taylor vector of a given order"""
+        result = np.zeros(len(psfs))
+        diff_x = xs - center_x
+        diff_y = ys - center_y
+        offset = 0
+        for psf, psf_count in zip(psfs, psf_counts):
+            spline = self._get_psf_taylor_spline(psf, order_x, order_y)
+            result[offset:offset+psf_count] = spline.ev(
+                diff_y[offset:offset+psf_count],
+                diff_x[offset:offset+psf_count]
+            )
+            offset += psf_count
+
+        return result
+
     def _calc_convolution_matrix(self, psfs_1, psf_counts_1, xs_1, ys_1,
                                  psfs_2, psf_counts_2, xs_2, ys_2):
         """Calculate the GG, GH, HH convolution matrices"""
@@ -316,6 +375,100 @@ class Subtractor(object):
             offset_1 += psf_count_1
 
         return matrix
+
+    def _calc_cross_matrix(self, x, y, psfs_1, psf_counts_1, xs_1, ys_1,
+                           psfs_2, psf_counts_2, xs_2, ys_2, offset=0.2):
+        """Calculate the GG, GH, HH matrices"""
+
+        # Estimate derivatives. We first calculate points on the following
+        # grid, and use the finite difference method
+        # a b c
+        # d e f
+        # g h i
+        f_a = self._calc_value(x-offset, y+offset)
+        f_b = self._calc_value(x,        y+offset)
+        f_c = self._calc_value(x+offset, y+offset)
+        f_d = self._calc_value(x-offset, y)
+        f_e = self._calc_value(x,        y)
+        f_f = self._calc_value(x+offset, y)
+        f_g = self._calc_value(x-offset, y-offset)
+        f_h = self._calc_value(x,        y-offset)
+        f_i = self._calc_value(x+offset, y-offset)
+
+        f = f_e
+        f_x = (f_f - f_d) / (2 * offset)
+        f_y = (f_b - f_h) / (2 * offset)
+        f_xx = (f_f - 2*f_e + f_d) / (offset * offset)
+        f_yy = (f_b - 2*f_e + f_h) / (offset * offset)
+        f_xy = (f_c + f_g - f_a - f_i) / (4 * offset * offset)
+
+        coeffs_1 = np.zeros(len(psfs_1))
+        coeffs_2 = np.zeros(len(psfs_2))
+
+        # print x, y, f, f_x, f_y, f_xx, f_yy, f_xy
+
+        terms = [
+            (0, 0, f),
+            (1, 0, f_x),
+            (0, 1, f_y),
+            (2, 0, f_xx / 2.),
+            (1, 1, f_xy / 2.),
+            (0, 2, f_yy),
+        ]
+
+        for order_x, order_y, factor in terms:
+            vec_1 = self._calc_psf_taylor_vector(
+                psfs_1, psf_counts_1, xs_1, ys_1, x, y, order_x, order_y
+            )
+            vec_2 = self._calc_psf_taylor_vector(
+                psfs_2, psf_counts_2, xs_2, ys_2, x, y, order_x, order_y
+            )
+            # print order_x, order_y, factor, np.min(vec_1), np.max(vec_1)
+            coeffs_1 += factor * vec_1
+            coeffs_2 += factor * vec_2
+
+        return np.outer(coeffs_1, coeffs_2)
+
+    def _calc_psf_vector(self, psfs, psf_counts, xs, ys, center_x, center_y):
+        """Calculate a PSF vector (gsn, hsn, etc.)"""
+        psf_vector = np.zeros(len(psfs))
+        diff_x = xs - center_x
+        diff_y = ys - center_y
+        offset = 0
+        for psf, psf_count in zip(psfs, psf_counts):
+            psf_vector[offset:offset+psf_count] = psf.psf_spline.ev(
+                diff_y[offset:offset+psf_count],
+                diff_x[offset:offset+psf_count]
+            )
+            offset += psf_count
+
+        return psf_vector
+
+    def _calc_value(self, x, y, radius=0.1):
+        """Calculate an approximate value of the underlying data function
+
+        This is smeared out by the PSF, so it isn't really right...
+        """
+        idx = self.ref_kdtree.query_ball_point((x, y), radius)
+        psfs = self.ref_psfs[idx]
+        order = psfs.argsort()
+        psfs = psfs[order]
+        vals = self.ref_vals[idx][order]
+        xs = self.ref_xs[idx][order]
+        ys = self.ref_ys[idx][order]
+
+        psf_objs, psf_counts = np.unique(
+            psfs,
+            return_counts=True
+        )
+
+        weights = self._calc_psf_vector(
+            psfs, psf_counts, xs, ys, x, y
+        )
+
+        val = weights.dot(vals) / np.sum(weights)
+
+        return val
 
     def _do_thread_subtraction(self, sub_grid, sub_grid_shape, err_grid,
                                err_grid_shape, x_grid, y_grid, start_index,
@@ -359,6 +512,7 @@ class Subtractor(object):
 
             ref_psfs = self.ref_psfs[ref_idx]
             ref_order = ref_psfs.argsort()
+            ref_psfs = ref_psfs[ref_order]
             ref_vals = self.ref_vals[ref_idx][ref_order]
             ref_errs = self.ref_errs[ref_idx][ref_order]
             ref_xs = self.ref_xs[ref_idx][ref_order]
@@ -393,27 +547,12 @@ class Subtractor(object):
                 ref_psfs, ref_psf_counts, ref_xs, ref_ys
             )
 
-            gsn = np.zeros(len(new_psfs))
-            offset = 0
-            diff_x = new_xs - x
-            diff_y = new_ys - y
-            for psf, psf_count in zip(new_psfs, new_psf_counts):
-                gsn[offset:offset+psf_count] = psf.psf_spline.ev(
-                    diff_y[offset:offset+psf_count],
-                    diff_x[offset:offset+psf_count]
-                )
-                offset += psf_count
-
-            hsn = np.zeros(len(ref_psfs))
-            offset = 0
-            diff_x = ref_xs - x
-            diff_y = ref_ys - y
-            for psf, psf_count in zip(ref_psfs, ref_psf_counts):
-                hsn[offset:offset+psf_count] = psf.psf_spline.ev(
-                    diff_y[offset:offset+psf_count],
-                    diff_x[offset:offset+psf_count]
-                )
-                offset += psf_count
+            gsn = self._calc_psf_vector(
+                new_psfs, new_psf_counts, new_xs, new_ys, x, y
+            )
+            hsn = self._calc_psf_vector(
+                ref_psfs, ref_psf_counts, ref_xs, ref_ys, x, y
+            )
 
             new_n = np.diag(new_errs**2)
             ref_n = np.diag(ref_errs**2)
@@ -425,10 +564,11 @@ class Subtractor(object):
             #amp = 5.*np.median(ref_errs) / gsn.dot(gsn)
             if ref_val < 0:
                 ref_val = 0
-            f = (ref_val)
-            amp = ref_val + 1.0 #ref_val + ref_err + new_err
-            #ref_amp = amp
-            ref_amp = 0.
+            f = ref_val / 10.
+            #f = 1.
+            amp = ref_val + 1.0#ref_val + ref_err + new_err
+            ref_amp = amp
+            #ref_amp = 0.
 
             a = gg*f**2 + amp**2 * np.outer(gsn, gsn) + new_n
             b = -2. * amp**2 * gsn
@@ -459,6 +599,7 @@ class Subtractor(object):
 
             sub_iter[i] = sub
             err_iter[i] = err
+
 
             #center_ra = (self.output_center_ra
                          #* np.cos(self.output_center_dec * np.pi / 180.)

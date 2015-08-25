@@ -30,11 +30,15 @@ s.add_new(base + 'gen_dither_8.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfmq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfoq_pam.fits', psf, 11)
 
-s.read_output_coordinates(base + 'gen_dither_1.fits', 'PRIMARY')
+s.read_output_coordinates(base + 'gen_dither_0.fits', 'PRIMARY')
 
 s.output_naxis1 = 150
 s.output_naxis2 = 150
 s.output_pixel_scale = 0.08
+
+#s.output_center_ra = 30.000834
+#s.output_center_dec = 30.000725
+
 
 #s.output_center_ra = 31.414949
 #s.output_center_dec = -58.493038

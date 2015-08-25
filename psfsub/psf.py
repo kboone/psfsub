@@ -117,6 +117,8 @@ class Psf(object):
             x_range,
             psf.data
         )
+        psf.pixel_scale = pixel_scale
+        psf.oversampling = oversampling
         psf.x_range = x_range
         psf.y_range = y_range
         psf.x_grid = x_grid
@@ -146,6 +148,23 @@ class Psf(object):
         #spline = RegularGridInterpolator((ra_range, dec_range),
                                          #convolved_data.T)
         spline = RectBivariateSpline(y_range, x_range, convolved_data)
+
+        return spline
+
+    def get_taylor_spline(self, order_x, order_y):
+        """Get the convolution of the PSF with (x^order_x*y^order_y)"""
+
+        data1 = self.data
+        data2 = self.x_grid**order_x * self.y_grid**order_y
+
+        convolved_data = fftconvolve(
+            data1,
+            data2,
+            mode='same'
+        ) / self.oversampling / self.oversampling
+
+        spline = RectBivariateSpline(self.y_range, self.x_range,
+                                     convolved_data)
 
         return spline
 
