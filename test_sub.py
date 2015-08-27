@@ -4,7 +4,8 @@ import pstats
 
 base = '/home/scpdata05/clustersn/kboone/idcsj/data/'
 
-psf = '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits'
+#psf = '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits'
+psf = '/home/kboone/optimal_subtraction/psfsub/f140w_11x00_tinytim_pixcap.fits'
 
 
 s = Subtractor()

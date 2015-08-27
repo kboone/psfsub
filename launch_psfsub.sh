@@ -13,7 +13,7 @@ binary=$HOME/optimal_subtraction/psfsub/test_sub.py
             #-p -100 &
     #done
 #done
-echo "export PATH=$PATH; cd $PWD; python $binary" | qsub -wd $PWD -S /bin/bash -pe orte 24 -sync y -p -100 &
+echo "export PATH=$PATH; cd $PWD; python $binary" | qsub -wd $PWD -S /bin/bash -l hostname="compute-2-[12]" -pe orte 24 -sync y -p -100 &
 
 wait
 

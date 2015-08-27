@@ -16,14 +16,14 @@ dithers = [
     (6.6666,   6.3333,   0.,   True),
 
     # ref 2
-    (0.,       0.,       20.,   True),
-    (3.3333,   3.6666,   20.,   True),
-    (6.6666,   6.3333,   20.,   True),
+    (0.,       0.,       45.,   True),
+    (3.3333,   3.6666,   45.,   True),
+    (6.6666,   6.3333,   45.,   True),
 
     # new
-    (0.,       0.,       40.,   False),
-    (3.3333,   3.6666,   40.,   False),
-    (6.6666,   6.3333,   40.,   False),
+    (0.,       0.,       90.,   False),
+    (3.3333,   3.6666,   90.,   False),
+    (6.6666,   6.3333,   90.,   False),
 ]
 size_x = 100
 size_y = 150
@@ -40,7 +40,7 @@ psf_y_max = 17.
 prefix = 'gen'
 
 
-psf_mode = 1
+psf_mode = 0
 
 
 def gauss2d(amp, center_x, center_y, sigma_x, sigma_y, x, y):
@@ -57,7 +57,7 @@ if psf_mode == 0:
 
         #out = np.exp(-x**2 / (2*sigma**2) + -y**2 / (2*sigma**2))
         out = np.exp(-((x-0.5)**2 / (2*sigma**2/4.) + y**2 / (2*sigma**2)))
-        out += np.exp(-((x)**2 / (2*sigma**2) + (y-0.5)**2 / (2*sigma**2/4.)))
+        #out += np.exp(-((x)**2 / (2*sigma**2) + (y-0.5)**2 / (2*sigma**2/4.)))
         out /= np.sum(out)
 
         return out

@@ -120,6 +120,9 @@ class Subtractor(object):
         self.new_ys = np.hstack([i.decs for i in self.new_images])
         self.new_ys *= 3600.
 
+        #self.new_xs += 0.001
+        #self.new_ys -= 0.005
+
         # Generate KDTrees.
         # TODO: Try to use a single KDTree for both? Profile this, and if the
         # KDTree is limiting then that might be a good idea.
@@ -470,6 +473,35 @@ class Subtractor(object):
 
         return val
 
+    def weighted_median(values, weights):
+        if len(values) == 1:
+            return values[0]
+        if len(values) == 0:
+            raise Exception("Can't do weighted median of nothing!")
+        order = np.argsort(values)
+        values = values[order]
+        weights = weights[order]
+        abs_weights = np.abs(weights)
+        cumsum = np.cumsum(abs_weights)
+        mid = cumsum[-1] / 2.
+        centers = cumsum - abs_weights / 2.
+        index = np.searchsorted(centers, mid, side='right')
+
+        val_left = values[index-1]
+        val_right = values[index]
+        center_left = centers[index-1]
+        center_right = centers[index]
+        center_diff = center_right - center_left
+
+        weight_right = (mid - center_left) / center_diff
+        weight_left = (center_right - mid) / center_diff
+
+        result = weight_left * val_left + weight_right * val_right
+        result *= np.sum(weights)
+
+        return result
+
+
     def _do_thread_subtraction(self, sub_grid, sub_grid_shape, err_grid,
                                err_grid_shape, x_grid, y_grid, start_index,
                                end_index, radius):
@@ -587,6 +619,10 @@ class Subtractor(object):
             s = -1/2. * (t.dot(c) + e).dot(d_inv)
 
             sub = t.dot(new_vals) - s.dot(ref_vals)
+
+            #print new_sub_val, t.dot(new_vals), ref_sub_val, s.dot(ref_vals), \
+                #new_sub_val - ref_sub_val, new_sub, old_sub
+
             err = np.sqrt(
                 (a.dot(t).dot(t)
                  + b.dot(t)
