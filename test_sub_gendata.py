@@ -3,8 +3,8 @@ import cProfile
 import pstats
 
 #base = '/home/kboone/optimal_subtraction/psfsub/test_bob_5/'
-#base = './'
-base = '/home/kboone/optimal_subtraction/psfsub/test_stats_1/'
+base = './'
+#base = '/home/kboone/optimal_subtraction/psfsub/test_stats_1/'
 
 print "Running on %s" % base
 
@@ -13,14 +13,14 @@ psf = base + 'gen_psf.fits'
 
 s = Subtractor()
 
-#s.add_reference(base + 'gen_dither_0.fits', psf, 11)
-#s.add_reference(base + 'gen_dither_1.fits', psf, 11)
-#s.add_reference(base + 'gen_dither_2.fits', psf, 11)
+s.add_reference(base + 'gen_dither_0.fits', psf, 11)
+s.add_reference(base + 'gen_dither_1.fits', psf, 11)
+s.add_reference(base + 'gen_dither_2.fits', psf, 11)
 s.add_reference(base + 'gen_dither_3.fits', psf, 11)
 s.add_reference(base + 'gen_dither_4.fits', psf, 11)
 s.add_reference(base + 'gen_dither_5.fits', psf, 11)
-#s.add_new(base + 'gen_dither_6.fits', psf, 11)
-#s.add_new(base + 'gen_dither_7.fits', psf, 11)
+s.add_new(base + 'gen_dither_6.fits', psf, 11)
+s.add_new(base + 'gen_dither_7.fits', psf, 11)
 s.add_new(base + 'gen_dither_8.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vD/F140W/icn10dfmq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vD/F140W/icn10dfoq_pam.fits', psf, 11)

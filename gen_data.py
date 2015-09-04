@@ -11,19 +11,19 @@ from scipy.interpolate import RectBivariateSpline
 
 dithers = [
     # ref 1
-    (0.,       0.,       0.,   True),
-    (3.3333,   3.6666,   0.,   True),
-    (6.6666,   6.3333,   0.,   True),
+    (0.,       0.,       57.2,   True),
+    (3.3333,   3.6666,   57.2,   True),
+    (6.6666,   6.3333,   57.2,   True),
 
     # ref 2
-    (0.,       0.,       45.,   True),
-    (3.3333,   3.6666,   45.,   True),
-    (6.6666,   6.3333,   45.,   True),
+    (0.,       0.,       82.8,   True),
+    (3.3333,   3.6666,   82.8,   True),
+    (6.6666,   6.3333,   82.8,   True),
 
     # new
-    (0.,       0.,       90.,   False),
-    (3.3333,   3.6666,   90.,   False),
-    (6.6666,   6.3333,   90.,   False),
+    (0.,       0.,       111.2,   False),
+    (3.3333,   3.6666,   111.2,   False),
+    (6.6666,   6.3333,   111.2,   False),
 ]
 size_x = 100
 size_y = 150
@@ -40,7 +40,7 @@ psf_y_max = 17.
 prefix = 'gen'
 
 
-psf_mode = 0
+psf_mode = 1
 
 
 def gauss2d(amp, center_x, center_y, sigma_x, sigma_y, x, y):
@@ -65,7 +65,7 @@ if psf_mode == 0:
 elif psf_mode == 1:
     # Load the PSF from a file instead.
     hdulist = fits.open(
-        '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits'
+        '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits'
     )
     psf_read_data = hdulist[0].data
 
@@ -101,6 +101,9 @@ def data_function(x, y, is_reference):
     out += 0.1*np.exp(-((x-20)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
     out += 0.5*np.exp(-((x-30)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
     out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-5)**2 / (2*0.1**2)))
+
+    out += gauss2d(1000.0, 30., 30., 0.1, 0.1, x, y)
+    out += gauss2d(100.0, 30., -30., 0.1, 0.1, x, y)
 
     if not is_reference:
         #out += 1.0*np.exp(-((x)**2 / (2*0.1**2) + (y-20)**2 / (2*0.1**2)))

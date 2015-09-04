@@ -71,13 +71,11 @@ class Psf(object):
         # to sum over a box around the desired point.
         hdulist = fits.open(path)
         data = hdulist[0].data
-        print "HACK: SKIPPING CONVOLUTION!"
-        #convolved_data = fftconvolve(
-            #data,
-            #np.ones((oversampling, oversampling)),
-            #mode='same'
-        #)
-        convolved_data = data
+        convolved_data = fftconvolve(
+            data,
+            np.ones((oversampling, oversampling)),
+            mode='same'
+        )
 
         # Generate a grid of coordinates in arcsecond space
         center_y, center_x = center_of_mass(convolved_data)

@@ -12,10 +12,10 @@ class Image(object):
         print "Loading %s" % path
         fits_file = FitsFile.open(path, readonly=True)
 
-        print "HACK!!!"
-        import os
-        basename = os.path.splitext(os.path.basename(path))[0]
-        psf_path = '/home/kboone/optimal_subtraction/psfsub/psfs/%s_psf.fits' % basename
+        #print "HACK!!!"
+        #import os
+        #basename = os.path.splitext(os.path.basename(path))[0]
+        #psf_path = '/home/kboone/optimal_subtraction/psfsub/psfs_conv/%s_psf.fits' % basename
 
         self.ras = []
         self.decs = []

@@ -4,21 +4,48 @@ import pstats
 
 base = '/home/scpdata05/clustersn/kboone/idcsj/data/'
 
-#psf = '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits'
-psf = '/home/kboone/optimal_subtraction/psfsub/f140w_11x00_tinytim_pixcap.fits'
+#psf = '/home/scpdata05/wfc3/PSF_iso/f105w_11x00_convolved_norm.fits'
+psf = '/home/scpdata05/wfc3/PSF_iso/f140w_11x00_convolved_norm.fits'
+#psf = '/home/scpdata05/wfc3/PSF_iso/f160w_11x00_convolved_norm.fits'
+#psf = '/home/kboone/optimal_subtraction/psfsub/f140w_dolphot_9x9.fits'
+#psf = '/home/kboone/optimal_subtraction/psfsub/f140w_11x00_tinytim_pixcap.fits'
 
 
 s = Subtractor()
 
+#s.add_reference(base + 'SPT0205/v6/F160W/icn192h9q_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/v6/F160W/icn192haq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vB/F160W/icn197neq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vB/F160W/icn197nfq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vB/F160W/icn197nlq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vB/F160W/icn197nnq_pam.fits', psf, 11)
+#s.add_new(base + 'SPT0205/vG_fakes/F160W/icn114ecq_pam.fits', psf, 11)
+#s.add_new(base + 'SPT0205/vG_fakes/F160W/icn114eeq_pam.fits', psf, 11)
+#s.add_new(base + 'SPT0205/vG_fakes/F160W/icn114egq_pam.fits', psf, 11)
+
+
+#s.add_reference(base + 'SPT0205/vA/F105W/icn111n1q_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vA/F105W/icn111n3q_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vA/F105W/icn111n5q_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vC/F105W/icn112a8q_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vC/F105W/icn112aaq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/vC/F105W/icn112acq_pam.fits', psf, 11)
+#s.add_new(base + 'SPT0205/vE_fakes/F105W/icn113yhq_pam.fits', psf, 11)
+#s.add_new(base + 'SPT0205/vE_fakes/F105W/icn113yiq_pam.fits', psf, 11)
+#s.add_new(base + 'SPT0205/vE_fakes/F105W/icn113ykq_pam.fits', psf, 11)
+
+#s.add_reference(base + 'SPT0205/v8/F140W/icn110agq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/v8/F140W/icn110aiq_pam.fits', psf, 11)
+#s.add_reference(base + 'SPT0205/v8/F140W/icn110akq_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vA/F140W/icn111myq_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vA/F140W/icn111mzq_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vA/F140W/icn111n7q_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vC/F140W/icn112a5q_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vC/F140W/icn112a6q_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vC/F140W/icn112aeq_pam.fits', psf, 11)
-s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113ymq_pam.fits', psf, 11)
-s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113yoq_pam.fits', psf, 11)
-s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113yqq_pam.fits', psf, 11)
+s.add_new(base + 'SPT0205/vE/F140W/icn113ymq_pam.fits', psf, 11)
+s.add_new(base + 'SPT0205/vE/F140W/icn113yoq_pam.fits', psf, 11)
+s.add_new(base + 'SPT0205/vE/F140W/icn113yqq_pam.fits', psf, 11)
 s.read_output_coordinates(base + 'SPT0205/sets/SPT0205_v1_F140W.fits')
 
 #s.add_reference(base + 'SPT2040/v1/F140W/icn128g3q_pam.fits', psf, 11)
@@ -60,9 +87,8 @@ s.read_output_coordinates(base + 'SPT0205/sets/SPT0205_v1_F140W.fits')
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfmq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfoq_pam.fits', psf, 11)
 
-
-s.output_naxis1 = 400
-s.output_naxis2 = 400
+s.output_naxis1 = 300
+s.output_naxis2 = 300
 
 #s.output_center_ra = 31.444359
 #s.output_center_dec = -58.485358

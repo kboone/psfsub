@@ -7,7 +7,7 @@ from scipy.interpolate import RectBivariateSpline
 basedir = '/home/kboone/optimal_subtraction/psfsub/'
 psf_path = basedir + 'tinytim_psf_f140w_bb5500.fits'
 in_pixel_scale = 0.039242
-output_path = basedir + 'f140w_11x00_tinytim_conv.fits'
+output_path = basedir + 'f140w_11x00_tinytim_noconv.fits'
 pixel_scale_x = 0.13543
 pixel_scale_y = 0.12096
 oversampling = 11
@@ -85,6 +85,9 @@ pix_cap_data = fftconvolve(
     mode='same'
 )
 pix_cap_data /= np.sum(pix_cap_data)
+
+print "SKIPPING INTERPIX CAP"
+pix_cap_data = out_data
 
 
 # Convolve with the pixel shape

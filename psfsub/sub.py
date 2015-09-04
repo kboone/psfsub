@@ -79,6 +79,16 @@ class Subtractor(object):
         pixel_scale = 3600.*np.sqrt(cd_matrix[0, 0]**2 + cd_matrix[0, 1]**2)
         self.output_pixel_scale = pixel_scale
 
+        # Test: object detection
+        import sep
+        data = hdulist[extension].data
+        data = data.byteswap(False).newbyteorder()
+        bkg = sep.Background(data)
+        rms = bkg.globalrms
+        objects = sep.extract(data, rms, deblend_cont=0.00001)
+        objects = objects[objects['npix'] > 10]
+        self.bright_objects = objects
+
     def load_data(self):
         """Load all of the data, and get it ready for processing.
 
@@ -120,9 +130,6 @@ class Subtractor(object):
         self.new_ys = np.hstack([i.decs for i in self.new_images])
         self.new_ys *= 3600.
 
-        #self.new_xs += 0.001
-        #self.new_ys -= 0.005
-
         # Generate KDTrees.
         # TODO: Try to use a single KDTree for both? Profile this, and if the
         # KDTree is limiting then that might be a good idea.
@@ -132,7 +139,7 @@ class Subtractor(object):
 
         print "Done loading data"
 
-    def do_subtraction(self, num_cores=24, num_tiles_x=1, num_tiles_y=1,
+    def do_subtraction(self, num_cores=8, num_tiles_x=1, num_tiles_y=1,
                        x_tile=0, y_tile=0, radius=0.3):
         """Do the subtraction.
 
@@ -311,7 +318,6 @@ class Subtractor(object):
                 fail_count += 1
                 if fail_count > 5:
                     logger.warn("Second instance of %s convolution "
-                                "waiting for initialization." %
                                 ((str[i] for i in index),))
                 time.sleep(0.1*scale_factor)
                 scale_factor *= 1.2
@@ -447,8 +453,11 @@ class Subtractor(object):
 
         return psf_vector
 
-    def _calc_value(self, x, y, radius=0.1):
+    def _calc_value(self, x, y, radius=0.1, is_star=False):
         """Calculate an approximate value of the underlying data function
+
+        If is_star is True, then the object is treated as a star (i.e. a single
+        point) instead of a smooth underlying function.
 
         This is smeared out by the PSF, so it isn't really right...
         """
@@ -469,7 +478,10 @@ class Subtractor(object):
             psfs, psf_counts, xs, ys, x, y
         )
 
-        val = weights.dot(vals) / np.sum(weights)
+        if is_star:
+            val = weights.dot(vals) / weights.dot(weights)
+        else:
+            val = weights.dot(vals) / np.sum(weights)
 
         return val
 
@@ -598,9 +610,9 @@ class Subtractor(object):
                 ref_val = 0
             f = ref_val / 10.
             #f = 1.
-            amp = ref_val + 1.0#ref_val + ref_err + new_err
-            ref_amp = amp
-            #ref_amp = 0.
+            amp = 100000.0#ref_val + ref_err + new_err
+            #ref_amp = amp
+            ref_amp = 100000.
 
             a = gg*f**2 + amp**2 * np.outer(gsn, gsn) + new_n
             b = -2. * amp**2 * gsn
@@ -622,16 +634,58 @@ class Subtractor(object):
 
             #print new_sub_val, t.dot(new_vals), ref_sub_val, s.dot(ref_vals), \
                 #new_sub_val - ref_sub_val, new_sub, old_sub
+            
+            # Remove amps from the final err, they are just there for
+            # normalization
+            a = gg*f**2 + new_n
+            c = -2. * gh*f**2
+            d = hh*f**2 + ref_n
 
             err = np.sqrt(
                 (a.dot(t).dot(t)
-                 + b.dot(t)
                  + c.dot(s).dot(t)
                  + d.dot(s).dot(s)
-                 + e.dot(s)
-                 + amp*amp
-                 + ref_amp*ref_amp)
+                 )
             )
+
+            debug = 0
+
+            if debug:
+                var_f = (
+                    (gg*f**2).dot(t).dot(t)
+                    - 2*(gh*f**2).dot(s).dot(t)
+                    + (hh*f**2).dot(s).dot(s)
+                )
+                var_gsn = (
+                    amp**2*np.outer(gsn, gsn).dot(t).dot(t)
+                    -2.*amp**2*gsn.dot(t)
+                    + amp*amp
+                )
+                var_hsn = (
+                    ref_amp**2*np.outer(hsn, hsn).dot(s).dot(s)
+                    -2.*ref_amp**2*hsn.dot(s)
+                    + ref_amp*ref_amp
+                )
+                var_refn = (
+                    ref_n.dot(s).dot(s)
+                )
+                var_newn = (
+                    new_n.dot(t).dot(t)
+                )
+
+                print "total var: %f -> check %f" % (err*err, var_f + var_gsn +
+                                                     var_hsn + var_refn +
+                                                     var_newn)
+                print "    var_f:   %f" % var_f
+                print "    var_gsn: %f" % var_gsn
+                print "    var_hsn: %f" % var_hsn
+                print "    var_refn: %f" % var_refn
+                print "    var_newn: %f" % var_newn
+                print "    ---"
+                print "    sub: %f" % sub
+                print "    err: %f" % err
+
+                from IPython import embed; embed()
 
             sub_iter[i] = sub
             err_iter[i] = err
