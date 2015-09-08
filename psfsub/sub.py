@@ -9,6 +9,7 @@ from astropy.wcs import WCS
 from scipy.spatial import cKDTree
 
 from data import Image
+from seechange.data import FitsFile
 
 logging.basicConfig(level=logging.INFO)
 
@@ -65,7 +66,9 @@ class Subtractor(object):
         are the same. The output should have a single science extension, be
         aligned north up and not have distortion.
         """
-        hdulist = fits.open(path, mode='readonly')
+        fits_file = FitsFile.open(path, readonly=True)
+
+        hdulist = fits_file.hdulist
 
         sci_header = hdulist[extension].header
 
@@ -81,13 +84,24 @@ class Subtractor(object):
 
         # Test: object detection
         import sep
-        data = hdulist[extension].data
-        data = data.byteswap(False).newbyteorder()
-        bkg = sep.Background(data)
-        rms = bkg.globalrms
-        objects = sep.extract(data, rms, deblend_cont=0.00001)
+        data = fits_file.get_data(copy=True)
+        mask = fits_file.get_mask()
+        sep_sky = fits_file.calc_sep_sky()
+        flat_sky_rms = sep_sky.globalrms
+        threshold = 5. * flat_sky_rms
+
+        # TODO: update to new sep which can use a variable mask
+        data[mask] = 0.
+        objects = sep.extract(data, threshold)
         objects = objects[objects['npix'] > 10]
         self.bright_objects = objects
+
+        obj_im_xs = objects['x'] + 1 + 0.1
+        obj_im_ys = objects['y'] + 1 + 0.1
+        obj_ras, obj_decs = fits_file.xy_to_rd(obj_im_xs, obj_im_ys)
+
+        self.bright_obj_ras = obj_ras
+        self.bright_obj_decs = obj_decs
 
     def load_data(self):
         """Load all of the data, and get it ready for processing.
@@ -136,6 +150,15 @@ class Subtractor(object):
         print "Generating KDTrees"
         self.ref_kdtree = cKDTree(zip(self.ref_xs, self.ref_ys))
         self.new_kdtree = cKDTree(zip(self.new_xs, self.new_ys))
+
+        # Load the bright objects
+        self.bright_obj_xs = (-np.cos(self.output_center_dec * np.pi / 180.) *
+                              3600. * self.bright_obj_ras)
+        self.bright_obj_ys = self.bright_obj_decs * 3600.
+        bright_obj_fluxes = [self._calc_value(x, y, radius=0.3, is_star=True)
+                             for x, y in zip(self.bright_obj_xs,
+                                             self.bright_obj_ys)]
+        self.bright_obj_fluxes = np.array(bright_obj_fluxes)
 
         print "Done loading data"
 
@@ -440,7 +463,7 @@ class Subtractor(object):
 
     def _calc_psf_vector(self, psfs, psf_counts, xs, ys, center_x, center_y):
         """Calculate a PSF vector (gsn, hsn, etc.)"""
-        psf_vector = np.zeros(len(psfs))
+        psf_vector = np.zeros(len(xs))
         diff_x = xs - center_x
         diff_y = ys - center_y
         offset = 0
@@ -475,7 +498,7 @@ class Subtractor(object):
         )
 
         weights = self._calc_psf_vector(
-            psfs, psf_counts, xs, ys, x, y
+            psf_objs, psf_counts, xs, ys, x, y
         )
 
         if is_star:
@@ -512,7 +535,6 @@ class Subtractor(object):
         result *= np.sum(weights)
 
         return result
-
 
     def _do_thread_subtraction(self, sub_grid, sub_grid_shape, err_grid,
                                err_grid_shape, x_grid, y_grid, start_index,
@@ -579,23 +601,23 @@ class Subtractor(object):
                 return_counts=True
             )
             gg = self._calc_convolution_matrix(
-                new_psfs, new_psf_counts, new_xs, new_ys,
-                new_psfs, new_psf_counts, new_xs, new_ys
+                new_psf_objs, new_psf_counts, new_xs, new_ys,
+                new_psf_objs, new_psf_counts, new_xs, new_ys
             )
             gh = self._calc_convolution_matrix(
-                new_psfs, new_psf_counts, new_xs, new_ys,
-                ref_psfs, ref_psf_counts, ref_xs, ref_ys
+                new_psf_objs, new_psf_counts, new_xs, new_ys,
+                ref_psf_objs, ref_psf_counts, ref_xs, ref_ys
             )
             hh = self._calc_convolution_matrix(
-                ref_psfs, ref_psf_counts, ref_xs, ref_ys,
-                ref_psfs, ref_psf_counts, ref_xs, ref_ys
+                ref_psf_objs, ref_psf_counts, ref_xs, ref_ys,
+                ref_psf_objs, ref_psf_counts, ref_xs, ref_ys
             )
 
             gsn = self._calc_psf_vector(
-                new_psfs, new_psf_counts, new_xs, new_ys, x, y
+                new_psf_objs, new_psf_counts, new_xs, new_ys, x, y
             )
             hsn = self._calc_psf_vector(
-                ref_psfs, ref_psf_counts, ref_xs, ref_ys, x, y
+                ref_psf_objs, ref_psf_counts, ref_xs, ref_ys, x, y
             )
 
             new_n = np.diag(new_errs**2)
@@ -609,16 +631,42 @@ class Subtractor(object):
             if ref_val < 0:
                 ref_val = 0
             f = ref_val / 10.
+            #f = self._calc_value(x, y, radius=0.3, is_star=True)
+            #f = 0.
             #f = 1.
-            amp = 100000.0#ref_val + ref_err + new_err
+            amp = 100.0#ref_val + ref_err + new_err
             #ref_amp = amp
-            ref_amp = 100000.
+            ref_amp = 100.
+
+            #ref_n += np.diag(np.ones(len(ref_n)) * (ref_val / 100.)**2)
+            #new_n += np.diag(np.ones(len(new_n)) * (ref_val / 100.)**2)
 
             a = gg*f**2 + amp**2 * np.outer(gsn, gsn) + new_n
             b = -2. * amp**2 * gsn
             c = -2. * gh*f**2
             d = hh*f**2 + ref_amp**2 * np.outer(hsn, hsn) + ref_n
             e = -2. * ref_amp**2 * hsn
+
+            # Bright objects
+            for obj_x, obj_y, obj_flux in zip(self.bright_obj_xs,
+                                              self.bright_obj_ys,
+                                              self.bright_obj_fluxes):
+                break
+                if (x - obj_x)**2 + (y - obj_y)**2 > 4.:
+                    continue
+                g_bright_obj = self._calc_psf_vector(
+                    new_psf_objs, new_psf_counts, new_xs, new_ys, obj_x, obj_y
+                )
+                h_bright_obj = self._calc_psf_vector(
+                    ref_psf_objs, ref_psf_counts, ref_xs, ref_ys, obj_x, obj_y
+                )
+
+                a += obj_flux*obj_flux*np.outer(g_bright_obj, g_bright_obj)
+                c += -2. * obj_flux*obj_flux*np.outer(g_bright_obj, h_bright_obj)
+                d += obj_flux*obj_flux*np.outer(h_bright_obj, h_bright_obj)
+
+                #a += np.diag((0.01*obj_flux*g_bright_obj)**2)
+                #d += np.diag((0.01*obj_flux*h_bright_obj)**2)
 
             d_inv = np.linalg.inv(d)
 
@@ -634,12 +682,34 @@ class Subtractor(object):
 
             #print new_sub_val, t.dot(new_vals), ref_sub_val, s.dot(ref_vals), \
                 #new_sub_val - ref_sub_val, new_sub, old_sub
-            
+
             # Remove amps from the final err, they are just there for
             # normalization
             a = gg*f**2 + new_n
             c = -2. * gh*f**2
             d = hh*f**2 + ref_n
+
+            # Bright objects
+            for obj_x, obj_y, obj_flux in zip(self.bright_obj_xs,
+                                              self.bright_obj_ys,
+                                              self.bright_obj_fluxes):
+                break
+                if (x - obj_x)**2 + (y - obj_y)**2 > 4.:
+                    continue
+                g_bright_obj = self._calc_psf_vector(
+                    new_psf_objs, new_psf_counts, new_xs, new_ys, obj_x, obj_y
+                )
+                h_bright_obj = self._calc_psf_vector(
+                    ref_psf_objs, ref_psf_counts, ref_xs, ref_ys, obj_x, obj_y
+                )
+
+                a += obj_flux*obj_flux*np.outer(g_bright_obj, g_bright_obj)
+                c += -2. * obj_flux*obj_flux*np.outer(g_bright_obj, h_bright_obj)
+                d += obj_flux*obj_flux*np.outer(h_bright_obj, h_bright_obj)
+
+                #a += np.diag((0.01*obj_flux*g_bright_obj)**2)
+                #d += np.diag((0.01*obj_flux*h_bright_obj)**2)
+
 
             err = np.sqrt(
                 (a.dot(t).dot(t)
@@ -647,6 +717,17 @@ class Subtractor(object):
                  + d.dot(s).dot(s)
                  )
             )
+
+            #err = np.sqrt(
+                #(a.dot(t).dot(t)
+                 #+ b.dot(t)
+                 #+ c.dot(s).dot(t)
+                 #+ d.dot(s).dot(s)
+                 #+ e.dot(s)
+                 #+ ref_amp*ref_amp
+                 #+ amp*amp
+                 #)
+            #)
 
             debug = 0
 

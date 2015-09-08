@@ -43,9 +43,9 @@ s.add_reference(base + 'SPT0205/vA/F140W/icn111n7q_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vC/F140W/icn112a5q_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vC/F140W/icn112a6q_pam.fits', psf, 11)
 s.add_reference(base + 'SPT0205/vC/F140W/icn112aeq_pam.fits', psf, 11)
-s.add_new(base + 'SPT0205/vE/F140W/icn113ymq_pam.fits', psf, 11)
-s.add_new(base + 'SPT0205/vE/F140W/icn113yoq_pam.fits', psf, 11)
-s.add_new(base + 'SPT0205/vE/F140W/icn113yqq_pam.fits', psf, 11)
+s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113ymq_pam.fits', psf, 11)
+s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113yoq_pam.fits', psf, 11)
+s.add_new(base + 'SPT0205/vE_fakes/F140W/icn113yqq_pam.fits', psf, 11)
 s.read_output_coordinates(base + 'SPT0205/sets/SPT0205_v1_F140W.fits')
 
 #s.add_reference(base + 'SPT2040/v1/F140W/icn128g3q_pam.fits', psf, 11)
@@ -87,8 +87,8 @@ s.read_output_coordinates(base + 'SPT0205/sets/SPT0205_v1_F140W.fits')
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfmq_pam.fits', psf, 11)
 #s.add_new(base + 'SPT0205/vF/F140W/icn10dfoq_pam.fits', psf, 11)
 
-s.output_naxis1 = 300
-s.output_naxis2 = 300
+s.output_naxis1 = 500
+s.output_naxis2 = 500
 
 #s.output_center_ra = 31.444359
 #s.output_center_dec = -58.485358

@@ -11,19 +11,19 @@ from scipy.interpolate import RectBivariateSpline
 
 dithers = [
     # ref 1
-    (0.,       0.,       57.2,   True),
-    (3.3333,   3.6666,   57.2,   True),
-    (6.6666,   6.3333,   57.2,   True),
+    (0.,       0.,       0.0,   True),
+    (3.3333,   3.6666,   0.0,   True),
+    (6.6666,   6.3333,   0.0,   True),
 
     # ref 2
-    (0.,       0.,       82.8,   True),
-    (3.3333,   3.6666,   82.8,   True),
-    (6.6666,   6.3333,   82.8,   True),
+    (0.,       0.,       0.0,   True),
+    (3.3333,   3.6666,   0.0,   True),
+    (6.6666,   6.3333,   0.0,   True),
 
     # new
-    (0.,       0.,       111.2,   False),
-    (3.3333,   3.6666,   111.2,   False),
-    (6.6666,   6.3333,   111.2,   False),
+    (0.,       0.,       90.0,   False),
+    (0.3333,   3.6666,   90.0,   False),
+    (6.6666,   6.3333,   90.0,   False),
 ]
 size_x = 100
 size_y = 150
@@ -81,38 +81,46 @@ elif psf_mode == 1:
         return psf_read_spline.ev(y, x)
 
 
+def add_star(data, x, y, star_x, star_y, star_flux):
+    star_data = gauss2d(star_flux, star_x, star_y, 0.05, 0.05, x, y)
+    star_data = star_data * star_flux / np.sum(star_data)
+    data += star_data
+
+
 def data_function(x, y, is_reference):
-    fwhm = 20.
-    sigma = fwhm / 2.3548
-    out = 0.05*np.exp(-((x+10)**2 / (2*sigma**2/2.) + y**2 / (2*sigma**2)))
+    out = np.zeros(x.shape)
+    #fwhm = 20.
+    #sigma = fwhm / 2.3548
+    #out = 0.05*np.exp(-((x+10)**2 / (2*sigma**2/2.) + y**2 / (2*sigma**2)))
 
-    fwhm = 4.
-    sigma = fwhm / 2.3548
-    out += 0.05*np.exp(-((x+20)**2 / (2*sigma**2/2.) + y**2 / (2*sigma**2)))
+    #fwhm = 4.
+    #sigma = fwhm / 2.3548
+    #out += 0.05*np.exp(-((x+20)**2 / (2*sigma**2/2.) + y**2 / (2*sigma**2)))
 
-    fwhm = 2.
-    sigma = fwhm / 2.3548
-    out += 0.1*np.exp(-((x+20)**2 / (2*sigma**2/2.) + (y-20)**2 / (2*sigma**2)))
+    #fwhm = 2.
+    #sigma = fwhm / 2.3548
+    #out += 0.1*np.exp(-((x+20)**2 / (2*sigma**2/2.) + (y-20)**2 / (2*sigma**2)))
 
-    fwhm = 2.
-    sigma = fwhm / 2.3548
-    out += 0.1*np.exp(-((x+20)**2 / (2*sigma**2/2.) + (y+20)**2 / (2*sigma**2)))
+    #fwhm = 2.
+    #sigma = fwhm / 2.3548
+    #out += 0.1*np.exp(-((x+20)**2 / (2*sigma**2/2.) + (y+20)**2 / (2*sigma**2)))
 
-    out += 0.1*np.exp(-((x-20)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
-    out += 0.5*np.exp(-((x-30)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
-    out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-5)**2 / (2*0.1**2)))
+    #out += 0.1*np.exp(-((x-20)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
+    #out += 0.5*np.exp(-((x-30)**2 / (2*0.1**2) + y**2 / (2*0.1**2)))
+    #out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-5)**2 / (2*0.1**2)))
 
-    out += gauss2d(1000.0, 30., 30., 0.1, 0.1, x, y)
-    out += gauss2d(100.0, 30., -30., 0.1, 0.1, x, y)
+    #out += gauss2d(1000.0, 0., 0., 0.1, 0.1, x, y)
+    add_star(out, x, y, 30., 30., 1000.)
+    add_star(out, x, y, 30., -30., 100.)
+    add_star(out, x, y, 0., 0., 1000.)
 
     if not is_reference:
-        #out += 1.0*np.exp(-((x)**2 / (2*0.1**2) + (y-20)**2 / (2*0.1**2)))
-        out += gauss2d(4.0, 0., 20., 0.1, 0.1, x, y)
-        out += gauss2d(2.0, 0., 10., 0.1, 0.1, x, y)
-        out += gauss2d(1.0, 0., 0., 0.1, 0.1, x, y)
-        out += gauss2d(0.5, 0., -10., 0.1, 0.1, x, y)
-        out += gauss2d(0.25, 0., -20., 0.1, 0.1, x, y)
-        out += 0.5*np.exp(-((x+20)**2 / (2*0.1**2) + (y-0)**2 / (2*0.1**2)))
+        add_star(out, x, y, 0., 20., 4.0)
+        add_star(out, x, y, 0., 10., 2.0)
+        add_star(out, x, y, 0., 0., 1.0)
+        add_star(out, x, y, 0., -10., 0.5)
+        add_star(out, x, y, 0., -20., 0.25)
+        add_star(out, x, y, -20., 0., 2.)
 
     return out
 
@@ -158,8 +166,10 @@ conv_psf_hdulist = fits.HDUList([conv_psf_hdu])
 conv_psf_hdulist.writeto('./%s_conv_psf.fits' % (prefix,), clobber=True)
 
 # Generate the data model
-data_x_range = np.arange(-0.75*size_x, 0.75*size_x, 1/oversampling)
-data_y_range = np.arange(-0.75*size_y, 0.75*size_y, 1/oversampling)
+num_x = int(0.75*size_x * oversampling)
+num_y = int(0.75*size_y * oversampling)
+data_x_range = (np.arange(2*num_x+1) - num_x) / oversampling
+data_y_range = (np.arange(2*num_y+1) - num_y) / oversampling
 
 data_x_grid, data_y_grid = np.meshgrid(data_x_range, data_y_range)
 
