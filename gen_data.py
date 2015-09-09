@@ -16,14 +16,14 @@ dithers = [
     (6.6666,   6.3333,   0.0,   True),
 
     # ref 2
-    (0.,       0.,       0.0,   True),
-    (3.3333,   3.6666,   0.0,   True),
-    (6.6666,   6.3333,   0.0,   True),
+    (0.,       0.,       30.0,   True),
+    (3.3333,   3.6666,   30.0,   True),
+    (6.6666,   6.3333,   30.0,   True),
 
     # new
-    (0.,       0.,       90.0,   False),
-    (0.3333,   3.6666,   90.0,   False),
-    (6.6666,   6.3333,   90.0,   False),
+    (0.,       0.,       60.0,   False),
+    (3.3333,   3.6666,   60.0,   False),
+    (6.6666,   6.3333,   60.0,   False),
 ]
 size_x = 100
 size_y = 150
@@ -82,7 +82,8 @@ elif psf_mode == 1:
 
 
 def add_star(data, x, y, star_x, star_y, star_flux):
-    star_data = gauss2d(star_flux, star_x, star_y, 0.05, 0.05, x, y)
+    sigma = 1. / oversampling / 10.
+    star_data = gauss2d(star_flux, star_x, star_y, sigma, sigma, x, y)
     star_data = star_data * star_flux / np.sum(star_data)
     data += star_data
 
@@ -110,6 +111,7 @@ def data_function(x, y, is_reference):
     #out += 0.2*np.exp(-((x)**2 / (2*0.1**2) + (y-5)**2 / (2*0.1**2)))
 
     #out += gauss2d(1000.0, 0., 0., 0.1, 0.1, x, y)
+
     add_star(out, x, y, 30., 30., 1000.)
     add_star(out, x, y, 30., -30., 100.)
     add_star(out, x, y, 0., 0., 1000.)
@@ -121,6 +123,7 @@ def data_function(x, y, is_reference):
         add_star(out, x, y, 0., -10., 0.5)
         add_star(out, x, y, 0., -20., 0.25)
         add_star(out, x, y, -20., 0., 2.)
+        pass
 
     return out
 
@@ -139,12 +142,17 @@ psf_x_grid, psf_y_grid = np.meshgrid(psf_x_range, psf_y_range)
 
 # Generate data, recenter, and generate again. This prevents dumb alignment
 # issues.
-psf_data = psf_function(psf_x_grid, psf_y_grid)
-center_y, center_x = center_of_mass(psf_data)
-shift_x = center_x / oversampling - psf_x_max
-shift_y = center_y / oversampling - psf_y_max
-print "Shifting by x=%.2f, y=%.2f" % (shift_x, shift_y)
-psf_data = psf_function(psf_x_grid + shift_x, psf_y_grid + shift_y)
+shift_x = 0.
+shift_y = 0.
+for i in range(5):
+    psf_data = psf_function(psf_x_grid + shift_x, psf_y_grid + shift_y)
+    center_y, center_x = center_of_mass(psf_data)
+    add_shift_x = center_x / oversampling - psf_x_max
+    add_shift_y = center_y / oversampling - psf_y_max
+    print "Shifting by x=%.5f, y=%.5f (data pix)" % (add_shift_x, add_shift_y)
+    shift_x += add_shift_x
+    shift_y += add_shift_y
+    psf_data = psf_function(psf_x_grid + shift_x, psf_y_grid + shift_y)
 
 # Write the PSF to a fits file
 psf_hdu = fits.PrimaryHDU(psf_data)

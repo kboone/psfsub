@@ -78,7 +78,7 @@ class Psf(object):
         )
 
         # Generate a grid of coordinates in arcsecond space
-        center_y, center_x = center_of_mass(convolved_data)
+        center_y, center_x = center_of_mass(data)
         y_pix_range = ((np.arange(data.shape[0]) - center_y) * pixel_scale_y /
                        oversampling)
         x_pix_range = ((np.arange(data.shape[1]) - center_x) * pixel_scale_x /

@@ -96,8 +96,10 @@ class Subtractor(object):
         objects = objects[objects['npix'] > 10]
         self.bright_objects = objects
 
-        obj_im_xs = objects['x'] + 1 + 0.1
-        obj_im_ys = objects['y'] + 1 + 0.1
+        obj_im_xs = objects['x'] + 1
+        obj_im_ys = objects['y'] + 1
+        #obj_im_xs[0] = 50.
+        #obj_im_ys[0] = 75.
         obj_ras, obj_decs = fits_file.xy_to_rd(obj_im_xs, obj_im_ys)
 
         self.bright_obj_ras = obj_ras
@@ -630,9 +632,9 @@ class Subtractor(object):
             #amp = 5.*np.median(ref_errs) / gsn.dot(gsn)
             if ref_val < 0:
                 ref_val = 0
-            f = ref_val / 10.
+            #f = ref_val / 10.
             #f = self._calc_value(x, y, radius=0.3, is_star=True)
-            #f = 0.
+            f = 0.
             #f = 1.
             amp = 100.0#ref_val + ref_err + new_err
             #ref_amp = amp
@@ -651,9 +653,8 @@ class Subtractor(object):
             for obj_x, obj_y, obj_flux in zip(self.bright_obj_xs,
                                               self.bright_obj_ys,
                                               self.bright_obj_fluxes):
-                break
-                if (x - obj_x)**2 + (y - obj_y)**2 > 4.:
-                    continue
+                #if (x - obj_x)**2 + (y - obj_y)**2 > 4.:
+                    #continue
                 g_bright_obj = self._calc_psf_vector(
                     new_psf_objs, new_psf_counts, new_xs, new_ys, obj_x, obj_y
                 )
@@ -693,9 +694,8 @@ class Subtractor(object):
             for obj_x, obj_y, obj_flux in zip(self.bright_obj_xs,
                                               self.bright_obj_ys,
                                               self.bright_obj_fluxes):
-                break
-                if (x - obj_x)**2 + (y - obj_y)**2 > 4.:
-                    continue
+                #if (x - obj_x)**2 + (y - obj_y)**2 > 4.:
+                    #continue
                 g_bright_obj = self._calc_psf_vector(
                     new_psf_objs, new_psf_counts, new_xs, new_ys, obj_x, obj_y
                 )
