@@ -80,15 +80,26 @@ elif psf_mode == 1:
     def psf_function(x, y):
         return psf_read_spline.ev(y, x)
 
+stars = []
+
 
 def add_star(data, x, y, star_x, star_y, star_flux):
-    sigma = 1. / oversampling / 10.
-    star_data = gauss2d(star_flux, star_x, star_y, sigma, sigma, x, y)
-    star_data = star_data * star_flux / np.sum(star_data)
-    data += star_data
+    # Don't use fast mode. It's not that much faster and it is much more
+    # inaccurate!
+    fast = False
+    if fast:
+        sigma = 1. / oversampling / 5.
+        star_data = gauss2d(star_flux, star_x, star_y, sigma, sigma, x, y)
+        star_data = star_data * star_flux / np.sum(star_data)
+        data += star_data
+    else:
+        stars.append((star_x, star_y, star_flux))
 
 
 def data_function(x, y, is_reference):
+    global stars
+    stars = []
+
     out = np.zeros(x.shape)
     #fwhm = 20.
     #sigma = fwhm / 2.3548
@@ -167,6 +178,7 @@ conv_psf_data = fftconvolve(
     np.ones((oversampling, oversampling)),
     mode='same'
 )
+conv_psf_spline = RectBivariateSpline(psf_y_range, psf_x_range, conv_psf_data)
 
 # Write the convolved PSF to a fits file
 conv_psf_hdu = fits.PrimaryHDU(conv_psf_data)
@@ -193,6 +205,7 @@ for i, dither_data in enumerate(dithers):
     angle_rad = rotation_angle * np.pi / 180.
     cw_rot_matrix = np.array([[np.cos(angle_rad), np.sin(angle_rad)],
                               [-np.sin(angle_rad), np.cos(angle_rad)]])
+    ccw_rot_matrix = np.linalg.inv(cw_rot_matrix)
 
     rot_x_grid, rot_y_grid = np.einsum(
         'ij, mni -> jmn',
@@ -208,6 +221,17 @@ for i, dither_data in enumerate(dithers):
         mode='same'
     )
 
+    # Add in stars. This gets the widths exactly right. Important if we are
+    # trying to subtract them.
+    for star_x, star_y, star_flux in stars:
+        rot_star_x, rot_star_y = cw_rot_matrix.dot(np.array([star_x, star_y]))
+        star_data = star_flux * conv_psf_spline(
+            data_y_range - rot_star_y,
+            data_x_range - rot_star_x
+        )
+
+        psf_applied_data += star_data
+
     spline = RectBivariateSpline(data_y_range, data_x_range, psf_applied_data)
 
     # Sample the data
@@ -221,7 +245,6 @@ for i, dither_data in enumerate(dithers):
     dither_data += np.random.normal(scale=noise_sigma, size=dither_data.shape)
 
     # Generate the WCS
-    ccw_rot_matrix = np.linalg.inv(cw_rot_matrix)
     ra_offset, dec_offset = ccw_rot_matrix.dot([x_offset, y_offset])
     dither_wcs = WCS(naxis=2)
     dither_wcs.wcs.crpix = [size_x / 2., size_y / 2.]

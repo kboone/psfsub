@@ -98,8 +98,6 @@ class Subtractor(object):
 
         obj_im_xs = objects['x'] + 1
         obj_im_ys = objects['y'] + 1
-        #obj_im_xs[0] = 50.
-        #obj_im_ys[0] = 75.
         obj_ras, obj_decs = fits_file.xy_to_rd(obj_im_xs, obj_im_ys)
 
         self.bright_obj_ras = obj_ras
